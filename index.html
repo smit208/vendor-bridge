@@ -5,8 +5,1366 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VendorBridge</title>
   <link rel="icon" type="image/png" href="/logo.png" />
+  <meta name="description" content="VendorBridge is a full-stack Procurement and Vendor Management ERP for managing vendors, RFQs, quotations, approvals, purchase orders, and invoices." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['DM Sans', 'sans-serif'], mono: ['DM Mono', 'monospace'] },
+          colors: {
+            primary: { DEFAULT: '#875A7B', dark: '#6D4A64', light: '#F3EEF2', mid: '#9B6B8E' },
+            success: '#00A09D',
+            warning: '#F0AD00',
+            danger:  '#D9534F',
+            surface: '#F0F0F0',
+            card:    '#FFFFFF',
+            border:  '#DEE2E6',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ═══════════════════════════════════════════════════
+       ODOO-STYLE DESIGN SYSTEM — VendorBridge ERP
+       Palette: Purple #875A7B · White sidebar · Clean UI
+    ═══════════════════════════════════════════════════ */
+    :root {
+      --primary:        #875A7B;
+      --primary-dark:   #6D4A64;
+      --primary-light:  #F3EEF2;
+      --primary-mid:    #9B6B8E;
+
+      --success:   #00A09D;
+      --warning:   #F0AD00;
+      --danger:    #D9534F;
+      --info:      #5B9BD5;
+
+      --surface:   #F0F0F0;
+      --card:      #FFFFFF;
+      --border:    #DEE2E6;
+      --border-lt: #EAEAEA;
+
+      --text-primary:   #212529;
+      --text-secondary: #6C757D;
+      --text-muted:     #9BA5B0;
+      --text-purple:    #875A7B;
+
+      --sidebar-width:  210px;
+      --header-height:  50px;
+
+      --shadow-xs: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
+      --shadow-md: 0 2px 10px rgba(0,0,0,0.10);
+      --shadow-lg: 0 4px 20px rgba(0,0,0,0.13);
+      --shadow-xl: 0 8px 40px rgba(0,0,0,0.16);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text-primary); background: var(--surface); }
+    #root { height: 100%; }
+    .mono { font-family: 'DM Mono', monospace; }
+
+    /* ── SIDEBAR ─────────────────────────────────────── */
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0;
+      width: var(--sidebar-width);
+      background: #FFFFFF;
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 50;
+      transition: width 220ms cubic-bezier(0.4,0,0.2,1);
+      overflow: hidden;
+    }
+    .sidebar.collapsed { width: 52px; }
+
+    .sidebar-logo {
+      height: var(--header-height);
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border-lt);
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; flex-shrink: 0;
+      user-select: none;
+    }
+    .sidebar-logo-icon {
+      width: 30px; height: 30px; border-radius: 7px;
+      background: var(--primary);
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; color: white; font-weight: 700; font-size: 11px;
+      letter-spacing: -0.5px;
+    }
+    .sidebar-logo-text { color: var(--text-primary); font-size: 14px; font-weight: 700; white-space: nowrap; letter-spacing: -0.3px; }
+    .sidebar-logo-sub  { display: none; }
+
+    .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; overflow-x: hidden; }
+    .sidebar-nav::-webkit-scrollbar { width: 0; }
+
+    .nav-section-title {
+      padding: 12px 16px 4px;
+      color: var(--text-muted); font-size: 9.5px; font-weight: 700;
+      letter-spacing: 0.9px; text-transform: uppercase; white-space: nowrap;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 16px;
+      color: var(--text-secondary);
+      cursor: pointer; transition: all 120ms ease;
+      white-space: nowrap; position: relative;
+      font-size: 13px; font-weight: 500;
+      border-left: 3px solid transparent;
+      min-height: 38px;
+    }
+    .nav-item:hover { color: var(--primary); background: var(--primary-light); }
+    .nav-item.active {
+      color: var(--primary);
+      background: var(--primary-light);
+      border-left-color: var(--primary);
+      font-weight: 600;
+    }
+    .nav-item.active::before { display: none; }
+    .nav-item-label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .nav-badge {
+      background: var(--danger); color: white;
+      font-size: 9px; font-weight: 700;
+      min-width: 18px; height: 18px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px; margin-left: auto; flex-shrink: 0;
+    }
+    .sidebar-footer {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border-lt);
+      font-size: 11px; color: var(--text-muted);
+      text-align: center; white-space: nowrap;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    /* ── HEADER ─────────────────────────────────────── */
+    .header {
+      position: fixed; left: var(--sidebar-width); right: 0; top: 0;
+      height: var(--header-height);
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 22px; z-index: 40;
+      transition: left 220ms cubic-bezier(0.4,0,0.2,1);
+    }
+    .header.sidebar-collapsed { left: 52px; }
+
+    /* ── MAIN CONTENT ───────────────────────────────── */
+    .main-content {
+      margin-left: var(--sidebar-width);
+      margin-top: var(--header-height);
+      padding: 24px;
+      min-height: calc(100vh - var(--header-height));
+      transition: margin-left 220ms cubic-bezier(0.4,0,0.2,1);
+    }
+    .main-content.sidebar-collapsed { margin-left: 52px; }
+
+    /* ── CARDS ──────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-xs);
+    }
+    .card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border-lt);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-body { padding: 18px; }
+    .card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+    /* ── METRIC CARDS ───────────────────────────────── */
+    .metric-card {
+      background: var(--card);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-xs);
+      padding: 18px 20px;
+      transition: box-shadow 150ms ease;
+    }
+    .metric-card:hover { box-shadow: var(--shadow-sm); }
+    .metric-value {
+      font-size: 28px; font-weight: 700;
+      color: var(--text-primary); margin: 6px 0 2px;
+      letter-spacing: -0.5px; line-height: 1.1;
+    }
+    .metric-label {
+      font-size: 11px; color: var(--text-muted);
+      font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .metric-change { font-size: 12px; margin-top: 4px; }
+
+    /* ── BUTTONS ─────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      height: 34px; padding: 0 14px;
+      border-radius: 4px; font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 1px solid transparent;
+      transition: all 140ms ease;
+      white-space: nowrap; font-family: 'DM Sans', sans-serif;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--primary); color: white; border-color: var(--primary-dark); }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); border-color: var(--primary-dark); }
+
+    .btn-secondary { background: white; color: var(--text-secondary); border-color: var(--border); }
+    .btn-secondary:hover:not(:disabled) { background: var(--surface); color: var(--text-primary); border-color: #C0C0C0; }
+
+    .btn-success { background: var(--success); color: white; border-color: #008784; }
+    .btn-success:hover:not(:disabled) { background: #008784; }
+
+    .btn-danger  { background: var(--danger); color: white; border-color: #C9302C; }
+    .btn-danger:hover:not(:disabled)  { background: #C9302C; }
+
+    .btn-warning { background: var(--warning); color: white; border-color: #E0A000; }
+    .btn-warning:hover:not(:disabled) { background: #E0A000; }
+
+    .btn-sm   { height: 28px; padding: 0 10px; font-size: 12px; border-radius: 3px; }
+    .btn-icon { width: 30px; height: 30px; padding: 0; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; }
+
+    /* ── FORMS ───────────────────────────────────────── */
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+    .form-label .req { color: var(--danger); }
+
+    .form-input {
+      height: 36px; border: 1px solid var(--border); border-radius: 4px;
+      padding: 0 10px; font-size: 13.5px; font-family: 'DM Sans', sans-serif;
+      color: var(--text-primary); background: white;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+      outline: none; width: 100%;
+    }
+    .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(135,90,123,0.12); }
+    .form-input.error { border-color: var(--danger); }
+    .form-input:disabled { background: #f8f8f8; color: var(--text-muted); cursor: not-allowed; }
+
+    .form-textarea {
+      border: 1px solid var(--border); border-radius: 4px;
+      padding: 8px 10px; font-size: 13.5px;
+      font-family: 'DM Sans', sans-serif; color: var(--text-primary);
+      background: white; transition: border-color 140ms ease;
+      outline: none; width: 100%; resize: vertical; min-height: 80px;
+    }
+    .form-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(135,90,123,0.12); }
+    .form-textarea:disabled { background: #f8f8f8; color: var(--text-muted); }
+
+    .form-select {
+      height: 36px; border: 1px solid var(--border); border-radius: 4px;
+      padding: 0 10px; font-size: 13.5px; font-family: 'DM Sans', sans-serif;
+      color: var(--text-primary); background: white;
+      cursor: pointer; outline: none; width: 100%;
+      transition: border-color 140ms ease;
+    }
+    .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(135,90,123,0.12); }
+    .form-select:disabled { background: #f8f8f8; color: var(--text-muted); }
+    .form-error { font-size: 11.5px; color: var(--danger); font-weight: 500; }
+
+    /* ── TABLES ──────────────────────────────────────── */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      text-align: left; padding: 9px 14px;
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.6px;
+      border-bottom: 1px solid var(--border); background: #FAFAFA;
+    }
+    .data-table td { padding: 10px 14px; font-size: 13.5px; border-bottom: 1px solid var(--border-lt); vertical-align: middle; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tbody tr { transition: background 100ms ease; }
+    .data-table tbody tr:hover td { background: var(--primary-light) !important; }
+
+    /* ── STATUS BADGES ───────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 3px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+
+    .badge-success { background: rgba(0,160,157,0.12); color: #007D7B; }
+    .badge-success .badge-dot { background: var(--success); }
+    .badge-danger  { background: rgba(217,83,79,0.12);  color: #A03030; }
+    .badge-danger  .badge-dot { background: var(--danger); }
+    .badge-warning { background: rgba(240,173,0,0.15);  color: #8A6200; }
+    .badge-warning .badge-dot { background: var(--warning); }
+    .badge-info    { background: rgba(91,155,213,0.15);  color: #3A6EA5; }
+    .badge-info    .badge-dot { background: var(--info); }
+    .badge-primary { background: var(--primary-light); color: var(--primary); }
+    .badge-primary .badge-dot { background: var(--primary); }
+    .badge-muted   { background: #F0F0F0; color: var(--text-secondary); }
+    .badge-muted   .badge-dot { background: var(--text-muted); }
+
+    /* ── MODALS ──────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.40); backdrop-filter: blur(1px);
+      z-index: 100; display: flex; align-items: center; justify-content: center;
+      padding: 24px; animation: fadeIn 140ms ease;
+    }
+    .modal {
+      background: white; border-radius: 6px;
+      box-shadow: var(--shadow-xl);
+      max-width: 560px; width: 100%; max-height: 90vh;
+      display: flex; flex-direction: column;
+      animation: slideUp 180ms ease; border: 1px solid var(--border);
+    }
+    .modal-lg  { max-width: 760px; }
+    .modal-xl  { max-width: 960px; }
+    .modal-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .modal-title  { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+    .modal-body   { padding: 18px 20px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-shrink: 0; background: #FAFAFA; border-radius: 0 0 6px 6px; }
+
+    /* ── SLIDE PANEL ─────────────────────────────────── */
+    .slide-panel { position: fixed; right: 0; top: 0; bottom: 0; width: 400px; background: white; box-shadow: -4px 0 20px rgba(0,0,0,0.12); z-index: 80; display: flex; flex-direction: column; animation: slideInRight 200ms ease; border-left: 1px solid var(--border); }
+    .slide-panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.25); z-index: 79; }
+    .slide-panel-header  { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .slide-panel-body    { flex: 1; overflow-y: auto; padding: 18px 20px; }
+
+    /* ── TOASTS ──────────────────────────────────────── */
+    .toast-container { position: fixed; top: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 6px; }
+    .toast { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 5px; background: white; box-shadow: var(--shadow-lg); border: 1px solid var(--border); border-left: 4px solid; min-width: 280px; max-width: 380px; animation: slideInRight 220ms ease; }
+    .toast-success { border-left-color: var(--success); }
+    .toast-error   { border-left-color: var(--danger); }
+    .toast-warning { border-left-color: var(--warning); }
+    .toast-info    { border-left-color: var(--primary); }
+    .toast-message { font-size: 13px; color: var(--text-primary); font-weight: 500; flex: 1; }
+    .toast-sub     { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+
+    /* ── TABS ────────────────────────────────────────── */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+    .tab { padding: 9px 16px; font-size: 13px; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 130ms ease; }
+    .tab:hover  { color: var(--text-primary); }
+    .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+    /* ── SEARCH ──────────────────────────────────────── */
+    .search-wrap { position: relative; }
+    .search-wrap input { padding-left: 34px; }
+    .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+
+    /* ── STARS ───────────────────────────────────────── */
+    .stars { display: inline-flex; gap: 1px; }
+    .star-filled { color: var(--warning); }
+    .star-empty  { color: #D1D5DB; }
+
+    /* ── STEP INDICATOR ──────────────────────────────── */
+    .steps { display: flex; align-items: center; margin-bottom: 28px; }
+    .step  { display: flex; align-items: center; flex: 1; }
+    .step-circle { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+    .step-circle.done    { background: var(--primary); color: white; }
+    .step-circle.active  { background: var(--primary); color: white; box-shadow: 0 0 0 3px var(--primary-light); }
+    .step-circle.pending { background: white; color: var(--text-muted); border: 2px solid var(--border); }
+    .step-label   { font-size: 11px; font-weight: 500; margin-top: 5px; }
+    .step-connector      { flex: 1; height: 2px; background: var(--border); margin: 0 6px; }
+    .step-connector.done { background: var(--primary); }
+
+    /* ── SKELETON ────────────────────────────────────── */
+    .skeleton { background: linear-gradient(90deg, #F0F0F0 25%, #E4E4E4 50%, #F0F0F0 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 3px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── AVATAR ──────────────────────────────────────── */
+    .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; flex-shrink: 0; }
+
+    /* ── NOTIFICATION DROPDOWN ───────────────────────── */
+    .notif-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; background: white; border-radius: 6px; box-shadow: var(--shadow-xl); border: 1px solid var(--border); z-index: 60; }
+    .notif-item { padding: 10px 14px; display: flex; gap: 10px; border-bottom: 1px solid var(--border-lt); cursor: pointer; transition: background 110ms ease; font-size: 13px; }
+    .notif-item:hover { background: var(--surface); }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-item.unread { background: var(--primary-light); }
+
+    /* ── PROFILE DROPDOWN ────────────────────────────── */
+    .profile-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 200px; background: white; border-radius: 6px; box-shadow: var(--shadow-xl); border: 1px solid var(--border); z-index: 60; }
+    .profile-dropdown-item { padding: 8px 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text-primary); font-size: 13px; transition: background 110ms ease; }
+    .profile-dropdown-item:hover { background: var(--surface); }
+    .profile-dropdown-item.danger { color: var(--danger); }
+
+    /* ── EMPTY STATE ─────────────────────────────────── */
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 52px 20px; text-align: center; }
+    .empty-state-icon  { color: var(--text-muted); margin-bottom: 12px; }
+    .empty-state-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+    .empty-state-sub   { font-size: 13px; color: var(--text-secondary); margin-bottom: 18px; }
+
+    /* ── LOGIN PAGE ──────────────────────────────────── */
+    .login-left {
+      background: linear-gradient(150deg, #6D4A64 0%, #875A7B 50%, #9B6B8E 100%);
+      position: relative; overflow: hidden;
+    }
+    .login-left::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 30% 70%, rgba(255,255,255,0.08) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    /* ── COMPARISON TABLE ────────────────────────────── */
+    .compare-cell-best  { background: rgba(0,160,157,0.08) !important; }
+    .compare-cell-worst { background: rgba(217,83,79,0.08)  !important; }
+
+    /* ── COMPARISON VENDOR CARD ──────────────────────── */
+    .compare-vendor-card { border: 1px solid var(--border); border-radius: 6px; padding: 14px; transition: all 140ms ease; cursor: pointer; background: white; }
+    .compare-vendor-card:hover    { border-color: var(--primary); }
+    .compare-vendor-card.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 2px rgba(135,90,123,0.18); }
+
+    /* ── TIMELINE ────────────────────────────────────── */
+    .timeline { position: relative; padding-left: 26px; }
+    .timeline::before { content: ''; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 1.5px; background: var(--border); }
+    .timeline-item { position: relative; margin-bottom: 18px; }
+    .timeline-dot  { position: absolute; left: -22px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; top: 3px; }
+    .timeline-dot.success { background: var(--success); box-shadow: 0 0 0 2px var(--success); }
+    .timeline-dot.danger  { background: var(--danger);  box-shadow: 0 0 0 2px var(--danger); }
+    .timeline-dot.primary { background: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+    .timeline-dot.muted   { background: var(--text-muted); box-shadow: 0 0 0 2px var(--text-muted); }
+
+    /* ── PRINT STYLES ────────────────────────────────── */
+    @media print {
+      .sidebar, .header, .no-print { display: none !important; }
+      .main-content { margin: 0 !important; padding: 0 !important; }
+      .print-invoice { max-width: 800px; margin: 0 auto; }
+    }
+
+    /* ── ANIMATIONS ──────────────────────────────────── */
+    @keyframes fadeIn      { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp     { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideInRight{ from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes spin        { to { transform: rotate(360deg); } }
+
+    /* ── SCROLLBAR ───────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CCC; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #AAA; }
+
+    /* ── RESPONSIVE — MOBILE FIRST ───────────────────── */
+
+    /* 768px and below = mobile/tablet */
+    @media (max-width: 768px) {
+
+      /* ── Sidebar becomes a full slide-over drawer ── */
+      .sidebar {
+        width: 220px !important;
+        transform: translateX(-100%);
+        box-shadow: none;
+        z-index: 200;
+        transition: transform 260ms cubic-bezier(0.4,0,0.2,1), box-shadow 260ms ease;
+      }
+      .sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+      }
+      /* Always show full text in mobile drawer */
+      .sidebar-logo-text, .sidebar-logo-sub,
+      .nav-item-label, .nav-section-title,
+      .nav-badge, .sidebar-footer { display: block !important; }
+      .nav-item {
+        padding: 11px 16px !important;
+        justify-content: flex-start !important;
+        border-left: 3px solid transparent !important;
+        min-height: 44px;
+      }
+      .nav-item.active { border-left-color: var(--primary) !important; }
+
+      /* ── Overlay backdrop ── */
+      .sidebar-overlay {
+        display: block !important;
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 199;
+        backdrop-filter: blur(1px);
+        animation: fadeIn 180ms ease;
+      }
+
+      /* ── Header spans full width ── */
+      .header {
+        left: 0 !important;
+        padding: 0 14px;
+      }
+      .header.sidebar-collapsed { left: 0 !important; }
+
+      /* ── Main content uses full width ── */
+      .main-content {
+        margin-left: 0 !important;
+        padding: 14px 12px 80px 12px;
+      }
+      .main-content.sidebar-collapsed { margin-left: 0 !important; }
+
+      /* ── Page title shrink ── */
+      .header h1 { font-size: 14px !important; }
+
+      /* ── Tables: horizontal scroll ── */
+      .data-table-wrap, .card > div { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .data-table { min-width: 560px; }
+
+      /* ── Cards ── */
+      .card-body { padding: 14px; }
+      .card-header { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+
+      /* ── Metric cards: 2 cols ── */
+      .metric-card { padding: 14px 16px; }
+      .metric-value { font-size: 22px; }
+
+      /* ── Filter bar: wrap ── */
+      .filter-bar { flex-wrap: wrap; }
+      .filter-bar .form-input,
+      .filter-bar .form-select { min-width: 0; flex: 1; }
+
+      /* ── Buttons full-width on very small ── */
+      .btn { touch-action: manipulation; }
+
+      /* ── Bottom navigation bar ── */
+      .mobile-bottom-nav {
+        display: flex !important;
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: 56px;
+        background: white;
+        border-top: 1px solid var(--border);
+        z-index: 100;
+        box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+      }
+
+      /* ── Login screen ── */
+      .login-left { display: none !important; }
+      .login-right {
+        width: 100% !important; min-width: 0 !important;
+        padding: 24px 20px !important;
+      }
+      .login-right > div { max-width: 100% !important; }
+
+      /* ── Modals ── */
+      .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+      .modal-box {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 90vh !important;
+        border-radius: 16px 16px 0 0 !important;
+        margin: 0 !important;
+        overflow-y: auto;
+      }
+
+      /* ── Comparison grid: single column ── */
+      div[style*="gridTemplateColumns"] { grid-template-columns: 1fr !important; }
+
+      /* ── RFQ stepper: compact ── */
+      .stepper-step { min-width: 32px; }
+      .stepper-label { display: none; }
+
+      /* ── Notification dropdown ── */
+      .notif-dropdown {
+        right: -60px !important;
+        width: calc(100vw - 24px) !important;
+        max-width: 360px;
+        left: auto !important;
+      }
+
+      /* ── Profile dropdown ── */
+      .profile-dropdown {
+        right: 0 !important;
+        left: auto !important;
+        width: 220px !important;
+      }
+
+      /* ── PO / Invoice print view ── */
+      .print-invoice { padding: 12px !important; }
+
+      /* ── Quick actions grid ── */
+      .quick-actions-grid { grid-template-columns: repeat(2,1fr) !important; }
+
+      /* ── Form grids ── */
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr !important; }
+
+      /* ── Page header row (title + button) ── */
+      .page-header-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+      }
+      .page-header-row .btn { width: 100%; justify-content: center; }
+    }
+
+    /* ── Very small phones ── */
+    @media (max-width: 400px) {
+      .main-content { padding: 10px 8px 72px 8px; }
+      .metric-value { font-size: 19px; }
+      .btn { font-size: 12px; height: 32px; padding: 0 11px; }
+    }
+
+    /* ── Tablet: 769–1024px (sidebar still shows but narrower) ── */
+    @media (min-width: 769px) and (max-width: 1024px) {
+      :root { --sidebar-width: 52px; }
+      .sidebar-logo-text, .sidebar-logo-sub, .nav-item-label,
+      .nav-section-title, .nav-badge, .sidebar-footer { display: none; }
+      .nav-item { padding: 10px 11px; justify-content: center; border-left: none !important; }
+      .nav-item.active { border-left: none !important; background: var(--primary-light); }
+      .grid-4 { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* ── Hidden by default on desktop (shown on mobile) ── */
+    .sidebar-overlay { display: none; }
+    .mobile-bottom-nav { display: none; }
+
+    @media (max-width: 1200px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 900px)  { .grid-3 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 640px)  { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    .pagination { display: flex; align-items: center; gap: 3px; }
+    .page-btn { width: 28px; height: 28px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; cursor: pointer; border: 1px solid var(--border); background: white; color: var(--text-secondary); transition: all 130ms ease; }
+    .page-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); font-weight: 600; }
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── MISC COMPONENTS ─────────────────────────────── */
+    .filter-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+    @media (max-width: 1200px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 900px)  { .grid-3 { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 640px)  { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    .quick-action { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--border); border-radius: 5px; background: white; cursor: pointer; transition: all 130ms ease; }
+    .quick-action:hover { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+    .quick-action-icon  { width: 32px; height: 32px; border-radius: 5px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .quick-action-label { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+
+    .checkbox-item { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; transition: all 130ms ease; }
+    .checkbox-item:hover   { background: var(--surface); }
+    .checkbox-item.checked { background: var(--primary-light); border-color: var(--primary); }
+
+    .rfq-status-bar { display: flex; align-items: center; padding: 14px 0; overflow-x: auto; }
+    .rfq-status-step { display: flex; flex-direction: column; align-items: center; min-width: 90px; }
+    .rfq-status-step-circle { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; }
+    .rfq-status-connector { flex: 1; height: 2px; min-width: 36px; }
+
+    .approval-step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; position: relative; }
+    .approval-step::before { content: ''; position: absolute; left: 13px; top: 40px; bottom: 0; width: 1.5px; background: var(--border); }
+    .approval-step:last-child::before { display: none; }
+    .approval-step-icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+    .priority-high   { color: var(--danger); font-weight: 600; }
+    .priority-medium { color: var(--warning); font-weight: 600; }
+    .priority-low    { color: var(--success); font-weight: 600; }
+
+    .deadline-urgent  { color: var(--danger); font-weight: 600; }
+    .deadline-warning { color: var(--warning); font-weight: 500; }
+
+    .invoice-doc { background: white; max-width: 900px; margin: 0 auto; border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-sm); }
+    .invoice-header-strip { background: var(--primary); color: white; padding: 20px 28px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: flex-start; }
+    .invoice-section { padding: 20px 28px; }
+    .invoice-divider { border: none; border-top: 1px solid var(--border); }
+
+    .log-create   { color: var(--success); }
+    .log-update   { color: var(--info); }
+    .log-approve  { color: var(--success); }
+    .log-reject   { color: var(--danger); }
+    .log-delete   { color: var(--danger); }
+    .log-send     { color: var(--info); }
+    .log-generate { color: var(--primary); }
+
+    .vendor-rating { display: flex; align-items: center; gap: 5px; }
+    .rating-stars  { display: flex; gap: 1px; }
+    .highlight     { background: #FFF3CD; border-radius: 2px; padding: 0 1px; }
+
+    .spinner      { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; }
+    .spinner-dark { border-color: rgba(135,90,123,0.15); border-top-color: var(--primary); }
+    .spin         { animation: spin 0.8s linear infinite; }
+    .chart-container { position: relative; }
+  </style>
 </head>
 <body>
-  <div id="root">Loading...</div>
-</body>
-</html>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useReducer, useContext, useEffect, useMemo, useRef, useCallback, createContext } = React;
+
+// ═══════════════════════════════════════════════════
+// CONSTANTS & SEED DATA
+// ═══════════════════════════════════════════════════
+
+const ROLES = { ADMIN: 'Admin', OFFICER: 'Procurement Officer', VENDOR: 'Vendor', MANAGER: 'Manager' };
+
+const VENDOR_CATEGORIES = ['IT', 'Logistics', 'Manufacturing', 'Office Supplies', 'Services', 'Construction'];
+
+const VENDOR_STATUSES = ['Active', 'Inactive', 'Blacklisted'];
+
+const RFQ_STATUSES = ['Draft', 'Sent', 'Quotations Received', 'Under Review', 'Closed'];
+
+const PO_STATUSES = ['Generated', 'Sent', 'Delivered', 'Invoiced', 'Paid', 'Cancelled'];
+
+const INVOICE_STATUSES = ['Draft', 'Sent', 'Paid', 'Overdue', 'Cancelled'];
+
+const APPROVAL_STATUSES = ['Pending', 'Approved', 'Rejected'];
+
+const PAYMENT_TERMS = ['Net 30', 'Net 45', 'Advance', 'On Delivery'];
+
+const GST_RATES = [0, 5, 12, 18, 28];
+
+const VALIDITY_PERIODS = ['15 days', '30 days', '45 days', '60 days'];
+
+const INITIAL_USERS = [
+  { id: 'u1', name: 'Arjun Mehta', email: 'admin@vendorbridge.com', password: 'admin123', role: ROLES.ADMIN, phone: '9876543210', department: 'Administration', createdAt: '2026-01-01' },
+  { id: 'u2', name: 'Priya Sharma', email: 'officer@vendorbridge.com', password: 'officer123', role: ROLES.OFFICER, phone: '9876543211', department: 'Procurement', createdAt: '2026-01-05' },
+  { id: 'u3', name: 'Ravi Kumar', email: 'vendor@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876543212', department: null, createdAt: '2026-01-10', vendorId: 'v1' },
+  { id: 'u4', name: 'Sneha Patel', email: 'manager@vendorbridge.com', password: 'manager123', role: ROLES.MANAGER, phone: '9876543213', department: 'Finance', createdAt: '2026-01-03' },
+  { id: 'u4b', name: 'BuildRight Construction', email: 'vendor2@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876500003', department: null, createdAt: '2026-01-18', vendorId: 'v4' },
+  { id: 'u5', name: 'CloudServe Systems', email: 'vendor3@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876500004', department: null, createdAt: '2026-01-20', vendorId: 'v5' },
+  { id: 'u6', name: 'QuickPrint Services', email: 'vendor4@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876500005', department: null, createdAt: '2026-01-22', vendorId: 'v6' },
+  { id: 'u7', name: 'OfficeHub Supplies', email: 'vendor5@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876500002', department: null, createdAt: '2026-01-15', vendorId: 'v3' },
+  { id: 'u8', name: 'FastShip Logistics', email: 'vendor6@vendorbridge.com', password: 'vendor123', role: ROLES.VENDOR, phone: '9876500001', department: null, createdAt: '2026-01-12', vendorId: 'v2' },
+];
+
+const INITIAL_VENDORS = [
+  { id: 'v1', name: 'TechSolutions Pvt Ltd', category: 'IT', gst: '27AAPCS0472N1Z2', pan: 'AAPCS0472N', contactPerson: 'Ravi Kumar', email: 'ravi@techsolutions.in', phone: '9876543212', address: '14, Hinjewadi Phase 2, Pune, Maharashtra 411057', bankAccount: '50200012345678', ifsc: 'HDFC0001234', status: 'Active', rating: 4.5, createdAt: '2026-01-10' },
+  { id: 'v2', name: 'FastShip Logistics', category: 'Logistics', gst: '24BBBFS1234B1Z3', pan: 'BBBFS1234B', contactPerson: 'Amit Shah', email: 'amit@fastship.co.in', phone: '9876500001', address: '8, GIDC Industrial Estate, Ankleshwar, Gujarat 393002', bankAccount: '40123456789012', ifsc: 'SBIN0001567', status: 'Active', rating: 3.8, createdAt: '2026-01-12' },
+  { id: 'v3', name: 'OfficeHub Supplies', category: 'Office Supplies', gst: '29CCCOH5678C1Z4', pan: 'CCCOH5678C', contactPerson: 'Divya Nair', email: 'divya@officehub.com', phone: '9876500002', address: '22, Koramangala 4th Block, Bengaluru, Karnataka 560034', bankAccount: '00112233445566', ifsc: 'ICIC0002345', status: 'Active', rating: 4.1, createdAt: '2026-01-15' },
+  { id: 'v4', name: 'BuildRight Construction', category: 'Construction', gst: '07DDDBC9012D1Z5', pan: 'DDDBC9012D', contactPerson: 'Manoj Verma', email: 'manoj@buildright.in', phone: '9876500003', address: '5, Sector 62, Noida, Uttar Pradesh 201309', bankAccount: '91234567890123', ifsc: 'PUNB0003456', status: 'Active', rating: 3.5, createdAt: '2026-01-18' },
+  { id: 'v5', name: 'CloudServe Systems', category: 'IT', gst: '06EEECS3456E1Z6', pan: 'EEECS3456E', contactPerson: 'Neha Gupta', email: 'neha@cloudserve.io', phone: '9876500004', address: 'Plot 18, Cyber City, Gurugram, Haryana 122002', bankAccount: '62123456789012', ifsc: 'AXIS0004567', status: 'Active', rating: 4.7, createdAt: '2026-01-20' },
+  { id: 'v6', name: 'QuickPrint Services', category: 'Services', gst: '33FFFPS7890F1Z7', pan: 'FFFPS7890F', contactPerson: 'Suresh Pillai', email: 'suresh@quickprint.in', phone: '9876500005', address: '3, Anna Nagar, Chennai, Tamil Nadu 600040', bankAccount: '30123456789011', ifsc: 'CITI0005678', status: 'Inactive', rating: 3.2, createdAt: '2026-01-22' },
+];
+
+const INITIAL_RFQS = [
+  {
+    id: 'rfq1', rfqNumber: 'RFQ-2026-0001', title: 'Office Furniture Procurement',
+    description: 'Procurement of ergonomic office furniture including chairs, desks, and storage units for the new Ahmedabad office expansion — 50 workstations.',
+    category: 'Office Supplies', deadline: '2026-04-30', priority: 'High',
+    status: 'Closed', createdBy: 'u2', createdAt: '2026-04-01',
+    vendors: ['v3', 'v6', 'v4'],
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', description: 'Mid-back mesh chair with lumbar support', qty: 50, unit: 'Nos', estimatedPrice: 8000 },
+      { id: 'li1b', name: 'Standing Desk', description: '1.5m × 0.75m height-adjustable desk', qty: 50, unit: 'Nos', estimatedPrice: 15000 },
+      { id: 'li1c', name: 'Storage Cabinet', description: '3-door steel storage cabinet', qty: 20, unit: 'Nos', estimatedPrice: 6000 },
+    ]
+  },
+  {
+    id: 'rfq2', rfqNumber: 'RFQ-2026-0002', title: 'Cloud Infrastructure Setup',
+    description: 'Setup of cloud-based infrastructure for internal applications — includes servers, storage, networking, and 12-month managed service.',
+    category: 'IT', deadline: '2026-06-20', priority: 'High',
+    status: 'Quotations Received', createdBy: 'u2', createdAt: '2026-05-10',
+    vendors: ['v1', 'v5'],
+    lineItems: [
+      { id: 'li2a', name: 'Cloud Server (4 vCPU, 16GB RAM)', description: 'Managed cloud VM with SSD storage', qty: 3, unit: 'Nos', estimatedPrice: 45000 },
+      { id: 'li2b', name: 'Object Storage (1TB)', description: 'S3-compatible object storage', qty: 1, unit: 'Pack', estimatedPrice: 12000 },
+      { id: 'li2c', name: 'Managed Service — Annual', description: 'L1/L2 support + monitoring', qty: 1, unit: 'Year', estimatedPrice: 120000 },
+    ]
+  },
+  {
+    id: 'rfq3', rfqNumber: 'RFQ-2026-0003', title: 'Security Cameras Installation',
+    description: 'Supply and installation of IP security cameras across all 3 office floors — 30 cameras with NVR and remote monitoring.',
+    category: 'Services', deadline: '2026-06-25', priority: 'Medium',
+    status: 'Sent', createdBy: 'u2', createdAt: '2026-05-20',
+    vendors: ['v1', 'v4', 'v6'],
+    lineItems: [
+      { id: 'li3a', name: 'IP Camera (5MP)', description: 'Outdoor/indoor IP camera with night vision', qty: 30, unit: 'Nos', estimatedPrice: 5500 },
+      { id: 'li3b', name: 'NVR 32-Channel', description: '4K NVR with 4TB HDD', qty: 1, unit: 'Nos', estimatedPrice: 35000 },
+      { id: 'li3c', name: 'Installation & Cabling', description: 'Professional installation per camera point', qty: 30, unit: 'Points', estimatedPrice: 1500 },
+    ]
+  },
+  {
+    id: 'rfq4', rfqNumber: 'RFQ-2026-0004', title: 'Printed Marketing Materials',
+    description: 'Printing of brochures, banners, business cards, and promotional merchandise for Q3 marketing campaign.',
+    category: 'Services', deadline: '2026-07-15', priority: 'Low',
+    status: 'Draft', createdBy: 'u2', createdAt: '2026-06-01',
+    vendors: ['v6', 'v3'],
+    lineItems: [
+      { id: 'li4a', name: 'Tri-fold Brochures A4', description: '4-colour printing, gloss lamination', qty: 2000, unit: 'Pcs', estimatedPrice: 12 },
+      { id: 'li4b', name: 'Pull-up Banners (6×2 ft)', description: 'Digital print with stand', qty: 10, unit: 'Nos', estimatedPrice: 2500 },
+      { id: 'li4c', name: 'Business Cards', description: '350gsm, 2-sided print', qty: 500, unit: 'Pcs', estimatedPrice: 6 },
+    ]
+  },
+];
+
+const INITIAL_QUOTATIONS = [
+  // RFQ 1 — Office Furniture
+  {
+    id: 'q1', rfqId: 'rfq1', vendorId: 'v3', vendorName: 'OfficeHub Supplies',
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', qty: 50, unit: 'Nos', unitPrice: 7500, subtotal: 375000 },
+      { id: 'li1b', name: 'Standing Desk', qty: 50, unit: 'Nos', unitPrice: 14200, subtotal: 710000 },
+      { id: 'li1c', name: 'Storage Cabinet', qty: 20, unit: 'Nos', unitPrice: 5800, subtotal: 116000 },
+    ],
+    subtotal: 1201000, gstRate: 18, gstAmount: 216180, grandTotal: 1417180,
+    deliveryDate: '2026-05-15', paymentTerms: 'Net 30', validityPeriod: '30 days',
+    notes: 'All items sourced from BrandXYZ. Delivery within 30 days of PO. Installation included.',
+    status: 'Accepted', submittedAt: '2026-04-10 10:32 AM',
+  },
+  {
+    id: 'q2', rfqId: 'rfq1', vendorId: 'v6', vendorName: 'QuickPrint Services',
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', qty: 50, unit: 'Nos', unitPrice: 8200, subtotal: 410000 },
+      { id: 'li1b', name: 'Standing Desk', qty: 50, unit: 'Nos', unitPrice: 15500, subtotal: 775000 },
+      { id: 'li1c', name: 'Storage Cabinet', qty: 20, unit: 'Nos', unitPrice: 6200, subtotal: 124000 },
+    ],
+    subtotal: 1309000, gstRate: 18, gstAmount: 235620, grandTotal: 1544620,
+    deliveryDate: '2026-05-20', paymentTerms: 'Net 45', validityPeriod: '30 days',
+    notes: 'Premium quality items. 1-year warranty on all furniture.',
+    status: 'Rejected', submittedAt: '2026-04-09 02:15 PM',
+  },
+  {
+    id: 'q3', rfqId: 'rfq1', vendorId: 'v4', vendorName: 'BuildRight Construction',
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', qty: 50, unit: 'Nos', unitPrice: 7800, subtotal: 390000 },
+      { id: 'li1b', name: 'Standing Desk', qty: 50, unit: 'Nos', unitPrice: 14800, subtotal: 740000 },
+      { id: 'li1c', name: 'Storage Cabinet', qty: 20, unit: 'Nos', unitPrice: 5600, subtotal: 112000 },
+    ],
+    subtotal: 1242000, gstRate: 18, gstAmount: 223560, grandTotal: 1465560,
+    deliveryDate: '2026-05-25', paymentTerms: 'On Delivery', validityPeriod: '15 days',
+    notes: 'We can deliver in batches if required.',
+    status: 'Rejected', submittedAt: '2026-04-11 09:45 AM',
+  },
+  // RFQ 2 — Cloud Infrastructure
+  {
+    id: 'q4', rfqId: 'rfq2', vendorId: 'v1', vendorName: 'TechSolutions Pvt Ltd',
+    lineItems: [
+      { id: 'li2a', name: 'Cloud Server (4 vCPU, 16GB RAM)', qty: 3, unit: 'Nos', unitPrice: 42000, subtotal: 126000 },
+      { id: 'li2b', name: 'Object Storage (1TB)', qty: 1, unit: 'Pack', unitPrice: 10500, subtotal: 10500 },
+      { id: 'li2c', name: 'Managed Service — Annual', qty: 1, unit: 'Year', unitPrice: 115000, subtotal: 115000 },
+    ],
+    subtotal: 251500, gstRate: 18, gstAmount: 45270, grandTotal: 296770,
+    deliveryDate: '2026-06-30', paymentTerms: 'Net 30', validityPeriod: '30 days',
+    notes: 'AWS infrastructure with 99.9% SLA. 24x7 monitoring included.',
+    status: 'Submitted', submittedAt: '2026-05-20 11:20 AM',
+  },
+  {
+    id: 'q5', rfqId: 'rfq2', vendorId: 'v5', vendorName: 'CloudServe Systems',
+    lineItems: [
+      { id: 'li2a', name: 'Cloud Server (4 vCPU, 16GB RAM)', qty: 3, unit: 'Nos', unitPrice: 39500, subtotal: 118500 },
+      { id: 'li2b', name: 'Object Storage (1TB)', qty: 1, unit: 'Pack', unitPrice: 9800, subtotal: 9800 },
+      { id: 'li2c', name: 'Managed Service — Annual', qty: 1, unit: 'Year', unitPrice: 108000, subtotal: 108000 },
+    ],
+    subtotal: 236300, gstRate: 18, gstAmount: 42534, grandTotal: 278834,
+    deliveryDate: '2026-06-28', paymentTerms: 'Net 30', validityPeriod: '45 days',
+    notes: 'Azure-based infrastructure. Dedicated account manager. Auto-scaling included.',
+    status: 'Submitted', submittedAt: '2026-05-22 03:45 PM',
+  },
+];
+
+const INITIAL_APPROVALS = [
+  {
+    id: 'ap1', rfqId: 'rfq1', quotationId: 'q1', vendorId: 'v3', vendorName: 'OfficeHub Supplies',
+    totalAmount: 1417180, requestedBy: 'u2', requestedAt: '2026-04-15 02:00 PM',
+    status: 'Approved', reviewedBy: 'u4', reviewedAt: '2026-04-16 10:30 AM',
+    remarks: 'Competitive pricing and good delivery timeline. Approved.',
+    poId: 'po1',
+  },
+  {
+    id: 'ap2', rfqId: 'rfq2', quotationId: 'q5', vendorId: 'v5', vendorName: 'CloudServe Systems',
+    totalAmount: 278834, requestedBy: 'u2', requestedAt: '2026-05-28 04:00 PM',
+    status: 'Pending', reviewedBy: null, reviewedAt: null, remarks: '', poId: null,
+  },
+];
+
+const INITIAL_POS = [
+  {
+    id: 'po1', poNumber: 'PO-2026-0001', rfqId: 'rfq1', rfqNumber: 'RFQ-2026-0001',
+    approvalId: 'ap1', quotationId: 'q1', vendorId: 'v3', vendorName: 'OfficeHub Supplies',
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', description: 'Mid-back mesh chair with lumbar support', qty: 50, unit: 'Nos', unitPrice: 7500, total: 375000 },
+      { id: 'li1b', name: 'Standing Desk', description: '1.5m × 0.75m height-adjustable desk', qty: 50, unit: 'Nos', unitPrice: 14200, total: 710000 },
+      { id: 'li1c', name: 'Storage Cabinet', description: '3-door steel storage cabinet', qty: 20, unit: 'Nos', unitPrice: 5800, total: 116000 },
+    ],
+    subtotal: 1201000, cgst: 108090, sgst: 108090, igst: 0, gstTotal: 216180, grandTotal: 1417180,
+    poDate: '2026-04-16', deliveryDate: '2026-05-15', paymentTerms: 'Net 30',
+    status: 'Invoiced', invoiceId: 'inv1',
+    notes: 'Please ensure all items are delivered in good condition with proper packaging. Installation assistance required.',
+    createdBy: 'u2',
+  },
+];
+
+const INITIAL_INVOICES = [
+  {
+    id: 'inv1', invoiceNumber: 'INV-2026-0001', poId: 'po1', poNumber: 'PO-2026-0001',
+    rfqNumber: 'RFQ-2026-0001', vendorId: 'v3', vendorName: 'OfficeHub Supplies',
+    lineItems: [
+      { id: 'li1a', name: 'Ergonomic Office Chair', hsn: '9401', description: 'Mid-back mesh chair with lumbar support', qty: 50, unit: 'Nos', rate: 7500, amount: 375000 },
+      { id: 'li1b', name: 'Standing Desk', hsn: '9403', description: '1.5m × 0.75m height-adjustable desk', qty: 50, unit: 'Nos', rate: 14200, amount: 710000 },
+      { id: 'li1c', name: 'Storage Cabinet', hsn: '9403', description: '3-door steel storage cabinet', qty: 20, unit: 'Nos', rate: 5800, amount: 116000 },
+    ],
+    subtotal: 1201000, cgst: 108090, sgst: 108090, igst: 0, gstTotal: 216180, grandTotal: 1417180,
+    invoiceDate: '2026-04-17', dueDate: '2026-05-17', status: 'Sent',
+    paymentDate: null, createdBy: 'u2',
+    notes: 'Payment due within 30 days. Late payment attracts 1.5% interest per month.',
+  },
+];
+
+const INITIAL_LOGS = [
+  { id: 'log1', timestamp: '2026-04-01 09:00 AM', userId: 'u2', userName: 'Priya Sharma', action: 'CREATE', entityType: 'RFQ', entityId: 'rfq1', details: 'Created RFQ "Office Furniture Procurement"' },
+  { id: 'log2', timestamp: '2026-04-01 09:15 AM', userId: 'u2', userName: 'Priya Sharma', action: 'SEND', entityType: 'RFQ', entityId: 'rfq1', details: 'Sent RFQ to 3 vendors: OfficeHub Supplies, QuickPrint Services, BuildRight Construction' },
+  { id: 'log3', timestamp: '2026-04-09 02:15 PM', userId: 'u6', userName: 'QuickPrint Services', action: 'CREATE', entityType: 'Quotation', entityId: 'q2', details: 'Submitted quotation for RFQ-2026-0001 — Grand Total: ₹15,44,620' },
+  { id: 'log4', timestamp: '2026-04-10 10:32 AM', userId: 'u3', userName: 'Ravi Kumar', action: 'CREATE', entityType: 'Quotation', entityId: 'q1', details: 'Submitted quotation for RFQ-2026-0001 — Grand Total: ₹14,17,180' },
+  { id: 'log5', timestamp: '2026-04-11 09:45 AM', userId: 'u4b', userName: 'BuildRight Construction', action: 'CREATE', entityType: 'Quotation', entityId: 'q3', details: 'Submitted quotation for RFQ-2026-0001 — Grand Total: ₹14,65,560' },
+  { id: 'log6', timestamp: '2026-04-14 03:00 PM', userId: 'u2', userName: 'Priya Sharma', action: 'UPDATE', entityType: 'RFQ', entityId: 'rfq1', details: 'Initiated quotation comparison for RFQ-2026-0001' },
+  { id: 'log7', timestamp: '2026-04-15 02:00 PM', userId: 'u2', userName: 'Priya Sharma', action: 'CREATE', entityType: 'Approval', entityId: 'ap1', details: 'Sent approval request — Selected vendor: OfficeHub Supplies (₹14,17,180)' },
+  { id: 'log8', timestamp: '2026-04-16 10:30 AM', userId: 'u4', userName: 'Sneha Patel', action: 'APPROVE', entityType: 'Approval', entityId: 'ap1', details: 'Approved procurement for OfficeHub Supplies. Remarks: Competitive pricing and good delivery timeline.' },
+  { id: 'log9', timestamp: '2026-04-16 10:31 AM', userId: 'u4', userName: 'Sneha Patel', action: 'GENERATE', entityType: 'PO', entityId: 'po1', details: 'Auto-generated PO-2026-0001 from approval AP-2026-0001' },
+  { id: 'log10', timestamp: '2026-04-16 11:00 AM', userId: 'u2', userName: 'Priya Sharma', action: 'SEND', entityType: 'PO', entityId: 'po1', details: 'Sent PO-2026-0001 to OfficeHub Supplies via email' },
+  { id: 'log11', timestamp: '2026-04-17 09:00 AM', userId: 'u2', userName: 'Priya Sharma', action: 'GENERATE', entityType: 'Invoice', entityId: 'inv1', details: 'Generated INV-2026-0001 from PO-2026-0001' },
+  { id: 'log12', timestamp: '2026-04-17 09:30 AM', userId: 'u2', userName: 'Priya Sharma', action: 'SEND', entityType: 'Invoice', entityId: 'inv1', details: 'Sent INV-2026-0001 to divya@officehub.com' },
+  { id: 'log13', timestamp: '2026-05-10 10:00 AM', userId: 'u2', userName: 'Priya Sharma', action: 'CREATE', entityType: 'RFQ', entityId: 'rfq2', details: 'Created RFQ "Cloud Infrastructure Setup"' },
+  { id: 'log14', timestamp: '2026-05-10 10:10 AM', userId: 'u2', userName: 'Priya Sharma', action: 'SEND', entityType: 'RFQ', entityId: 'rfq2', details: 'Sent RFQ to 2 vendors: TechSolutions Pvt Ltd, CloudServe Systems' },
+  { id: 'log15', timestamp: '2026-05-28 04:00 PM', userId: 'u2', userName: 'Priya Sharma', action: 'CREATE', entityType: 'Approval', entityId: 'ap2', details: 'Sent approval request — Selected vendor: CloudServe Systems (₹2,78,834)' },
+];
+
+const INITIAL_NOTIFICATIONS = [
+  { id: 'n1', type: 'approval', message: 'Approval request pending for RFQ-2026-0002', time: '2026-05-28 04:00 PM', read: false, userId: 'u4' },
+  { id: 'n2', type: 'quotation', message: 'New quotation received from CloudServe Systems', time: '2026-05-22 03:45 PM', read: false, userId: 'u2' },
+  { id: 'n3', type: 'quotation', message: 'New quotation received from TechSolutions Pvt Ltd', time: '2026-05-20 11:20 AM', read: true, userId: 'u2' },
+  { id: 'n4', type: 'rfq', message: 'RFQ-2026-0003 sent to vendors successfully', time: '2026-05-20 09:00 AM', read: true, userId: 'u2' },
+  { id: 'n5', type: 'invoice', message: 'Invoice INV-2026-0001 sent to OfficeHub Supplies', time: '2026-04-17 09:30 AM', read: true, userId: 'u2' },
+  { id: 'n6', type: 'po', message: 'Purchase Order PO-2026-0001 generated', time: '2026-04-16 10:31 AM', read: true, userId: 'u2' },
+  { id: 'n7', type: 'rfq', message: 'You have been assigned to RFQ-2026-0003', time: '2026-05-20 09:00 AM', read: false, userId: 'u3' },
+  { id: 'n8', type: 'po', message: 'Purchase Order PO-2026-0001 received from VendorBridge', time: '2026-04-16 11:00 AM', read: true, userId: 'u3' },
+];
+
+// ═══════════════════════════════════════════════════
+// UTILITY FUNCTIONS
+// ═══════════════════════════════════════════════════
+
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined) return '—';
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr.split(' ')[0]);
+  if (isNaN(d)) return dateStr;
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const formatDateTime = (dtStr) => {
+  if (!dtStr) return '—';
+  const parts = dtStr.split(' ');
+  return `${formatDate(parts[0])}${parts[1] ? ' ' + parts[1] + (parts[2] ? ' ' + parts[2] : '') : ''}`;
+};
+
+const timeAgo = (dtStr) => {
+  if (!dtStr) return '';
+  const now = new Date('2026-06-06');
+  const then = new Date(dtStr.split(' ')[0]);
+  const diffDays = Math.floor((now - then) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return `${Math.floor(diffDays / 30)} months ago`;
+};
+
+const daysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const now = new Date('2026-06-06');
+  const then = new Date(dateStr);
+  return Math.ceil((then - now) / (1000 * 60 * 60 * 24));
+};
+
+const generateId = (prefix) => `${prefix}${Date.now()}${Math.floor(Math.random() * 1000)}`;
+
+const generateRFQNumber = (count) => `RFQ-2026-${String(count).padStart(4, '0')}`;
+
+const generatePONumber = (count) => `PO-2026-${String(count).padStart(4, '0')}`;
+
+const generateInvoiceNumber = (count) => `INV-2026-${String(count).padStart(4, '0')}`;
+
+const generateApprovalId = (count) => `AP-2026-${String(count).padStart(4, '0')}`;
+
+const getAvatarColor = (name) => {
+  const colors = ['#1B4FD8','#0EA5E9','#16A34A','#D97706','#DC2626','#7C3AED','#DB2777','#0891B2'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
+const getInitials = (name) => {
+  if (!name) return '?';
+  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+};
+
+const getStatusBadgeClass = (status) => {
+  const map = {
+    'Active': 'badge-success', 'Approved': 'badge-success', 'Paid': 'badge-success',
+    'Delivered': 'badge-success', 'Accepted': 'badge-success', 'Closed': 'badge-success',
+    'Selected': 'badge-success',
+    'Inactive': 'badge-muted', 'Draft': 'badge-muted', 'Cancelled': 'badge-muted',
+    'Not Submitted': 'badge-muted',
+    'Pending': 'badge-warning', 'Under Review': 'badge-warning',
+    'Approval Pending': 'badge-warning',
+    'Sent': 'badge-info', 'Submitted': 'badge-info', 'Invoiced': 'badge-info',
+    'Quotations Received': 'badge-primary', 'Generated': 'badge-primary',
+    'Rejected': 'badge-danger', 'Blacklisted': 'badge-danger', 'Overdue': 'badge-danger',
+    'Late': 'badge-danger',
+  };
+  return map[status] || 'badge-muted';
+};
+
+
+const calculateGST = (subtotal, gstRate, isInterstate = false) => {
+  const gstAmount = (subtotal * gstRate) / 100;
+  if (isInterstate) return { cgst: 0, sgst: 0, igst: gstAmount, total: gstAmount };
+  return { cgst: gstAmount / 2, sgst: gstAmount / 2, igst: 0, total: gstAmount };
+};
+
+const validateGST = (gst) => /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst);
+
+const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const validatePhone = (phone) => /^[6-9]\d{9}$/.test(phone);
+
+const debounce = (fn, delay) => {
+  let timer;
+  return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
+};
+
+const exportToCSV = (data, columns, filename) => {
+  const header = columns.map(c => c.label).join(',');
+  const rows = data.map(row => columns.map(c => {
+    const val = typeof c.value === 'function' ? c.value(row) : row[c.key] || '';
+    return `"${String(val).replace(/"/g, '""')}"`;
+  }).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${filename}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+};
+
+const Stars = ({ rating, max = 5 }) => {
+  const full = Math.floor(rating);
+  const half = rating % 1 >= 0.5;
+  return (
+    <div className="rating-stars">
+      {Array.from({ length: max }).map((_, i) => (
+        <span key={i} style={{ fontSize: 14, color: i < full ? '#F59E0B' : (i === full && half ? '#F59E0B' : '#D1D5DB') }}>
+          {i < full ? '★' : (i === full && half ? '★' : '☆')}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// APP CONTEXT
+// ═══════════════════════════════════════════════════
+
+const AppContext = createContext(null);
+
+// ═══════════════════════════════════════════════════
+// STORAGE — single key, single save, nothing missed
+// ═══════════════════════════════════════════════════
+const STORAGE_KEY  = 'vendorbridge_data';
+const SESSION_KEY  = 'vendorbridge_session';
+
+const loadState = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+};
+
+const saveState = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch { console.warn('Could not save state'); }
+};
+
+// ── SEED_DATA bundles all initial data ───────────────────────────────────────
+const SEED_DATA = {
+  users:         INITIAL_USERS,
+  vendors:       INITIAL_VENDORS,
+  rfqs:          INITIAL_RFQS,
+  quotations:    INITIAL_QUOTATIONS,
+  approvals:     INITIAL_APPROVALS,
+  pos:           INITIAL_POS,
+  invoices:      INITIAL_INVOICES,
+  logs:          INITIAL_LOGS,
+  notifications: INITIAL_NOTIFICATIONS,
+};
+
+// ── REDUCER — every mutation goes through here ────────────────────────────────
+const appReducer = (state, action) => {
+  const apply = (key, updater) => ({
+    ...state,
+    [key]: typeof updater === 'function' ? updater(state[key]) : updater,
+  });
+  switch (action.type) {
+    case 'SET_USERS':         return apply('users',         action.payload);
+    case 'SET_VENDORS':       return apply('vendors',       action.payload);
+    case 'SET_RFQS':          return apply('rfqs',          action.payload);
+    case 'SET_QUOTATIONS':    return apply('quotations',    action.payload);
+    case 'SET_APPROVALS':     return apply('approvals',     action.payload);
+    case 'SET_POS':           return apply('pos',           action.payload);
+    case 'SET_INVOICES':      return apply('invoices',      action.payload);
+    case 'SET_LOGS':          return apply('logs',          action.payload);
+    case 'SET_NOTIFICATIONS': return apply('notifications', action.payload);
+    case 'RESET':             return { ...SEED_DATA };
+    default: return state;
+  }
+};
+
+// ═══════════════════════════════════════════════════
+// APP PROVIDER
+// ═══════════════════════════════════════════════════
+const AppProvider = ({ children }) => {
+  // ── Load persisted data OR seed on first run ─────────────────────────────
+  const [state, dispatch] = useReducer(appReducer, null, () => loadState() || SEED_DATA);
+
+  // ── Session: auto-login from localStorage ────────────────────────────────
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const s = localStorage.getItem(SESSION_KEY);
+      return s ? JSON.parse(s) : null;
+    } catch { return null; }
+  });
+
+  // UI-only state (not persisted)
+  const [toasts,      setToasts]      = useState([]);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // ── Single useEffect saves ALL state on every change ─────────────────────
+  useEffect(() => { saveState(state); }, [state]);
+
+  // ── Convenience action creators (keep same API for all components) ────────
+  const setUsers         = useCallback(u => dispatch({ type: 'SET_USERS',         payload: u }), []);
+  const setVendors       = useCallback(u => dispatch({ type: 'SET_VENDORS',       payload: u }), []);
+  const setRfqs          = useCallback(u => dispatch({ type: 'SET_RFQS',          payload: u }), []);
+  const setQuotations    = useCallback(u => dispatch({ type: 'SET_QUOTATIONS',    payload: u }), []);
+  const setApprovals     = useCallback(u => dispatch({ type: 'SET_APPROVALS',     payload: u }), []);
+  const setPos           = useCallback(u => dispatch({ type: 'SET_POS',           payload: u }), []);
+  const setInvoices      = useCallback(u => dispatch({ type: 'SET_INVOICES',      payload: u }), []);
+  const setLogs          = useCallback(u => dispatch({ type: 'SET_LOGS',          payload: u }), []);
+  const setNotifications = useCallback(u => dispatch({ type: 'SET_NOTIFICATIONS', payload: u }), []);
+
+  // ── Domain helpers ────────────────────────────────────────────────────────
+  const addLog = useCallback((action, entityType, entityId, details) => {
+    const entry = {
+      id: generateId('log'),
+      timestamp: new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+      userId:   currentUser?.id   || 'system',
+      userName: currentUser?.name || 'System',
+      action, entityType, entityId, details,
+    };
+    dispatch({ type: 'SET_LOGS', payload: prev => [entry, ...prev] });
+  }, [currentUser]);
+
+  const addNotification = useCallback((type, message, userId) => {
+    const notif = {
+      id: generateId('n'), type, message,
+      time: new Date().toLocaleString('en-IN'),
+      read: false, userId: userId || currentUser?.id,
+    };
+    dispatch({ type: 'SET_NOTIFICATIONS', payload: prev => [notif, ...prev] });
+  }, [currentUser]);
+
+  const showToast = useCallback((message, type = 'success', sub = '') => {
+    const id = generateId('t');
+    setToasts(prev => [...prev, { id, message, type, sub }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  // usersRef always points to latest users — avoids stale closure in login
+  const usersRef = useRef(state.users);
+  useEffect(() => { usersRef.current = state.users; }, [state.users]);
+
+  const login = useCallback((email, password) => {
+    const user = usersRef.current.find(u => u.email === email && u.password === password);
+    if (!user) return false;
+    setCurrentUser(user);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    return user;
+  }, []);
+
+  const logout = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+    setCurrentPage('dashboard');
+  }, []);
+
+  const signup = useCallback((data) => {
+    if (state.users.find(u => u.email === data.email)) return { error: 'Email already registered' };
+    const newUser = {
+      id: generateId('u'), ...data,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    dispatch({ type: 'SET_USERS', payload: prev => [...prev, newUser] });
+    // If signing up as Vendor, auto-create a vendor record and link vendorId
+    if (data.role === ROLES.VENDOR) {
+      const newVendor = {
+        id: generateId('v'), name: data.name,
+        category: 'Services', gst: '', pan: '',
+        contactPerson: data.name, email: data.email,
+        phone: data.phone || '', address: '',
+        bankAccount: '', ifsc: '',
+        status: 'Active', rating: 3.0,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      dispatch({ type: 'SET_VENDORS', payload: prev => [...prev, newVendor] });
+      newUser.vendorId = newVendor.id;
+      // Re-dispatch user update with vendorId
+      dispatch({ type: 'SET_USERS', payload: prev => prev.map(u => u.id === newUser.id ? { ...u, vendorId: newVendor.id } : u) });
+    }
+    // Auto-login the new user immediately — no stale closure, uses newUser directly
+    setCurrentUser(newUser);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+    return { success: true, user: newUser };
+  }, [state.users]);
+
+  const markAllRead = useCallback(() => {
+    dispatch({ type: 'SET_NOTIFICATIONS', payload: prev =>
+      prev.map(n => n.userId === currentUser?.id ? { ...n, read: true } : n)
+    });
+  }, [currentUser]);
+
+  const userNotifications = useMemo(() =>
+    state.notifications.filter(n => !n.userId || n.userId === currentUser?.id),
+    [state.notifications, currentUser]);
+
+  const unreadCount = useMemo(() =>
+    userNotifications.filter(n => !n.read).length,
+    [userNotifications]);
+
+  const pendingApprovalsCount = useMemo(() =>
+    state.approvals.filter(a => a.status === 'Pending').length,
+    [state.approvals]);
+
+  return (
+    <AppContext.Provider value={{
+      // state slices
+      users:         state.users,
+      vendors:       state.vendors,
+      rfqs:          state.rfqs,
+      quotations:    state.quotations,
+      approvals:     state.approvals,
+      pos:           state.pos,
+      invoices:      state.invoices,
+      logs:          state.logs,
+      notifications: state.notifications,
+      // setters (dispatch-backed)
+      setUsers, setVendors, setRfqs, setQuotations,
+      setApprovals, setPos, setInvoices, setLogs, setNotifications,
+      // auth
+      currentUser, login, logout, signup,
+      // helpers
+      addLog, addNotification, showToast, markAllRead,
+      userNotifications, unreadCount, pendingApprovalsCount,
+      // ui
+      toasts, currentPage, setCurrentPage,
+      // reset (Admin only)
+      resetToSeed: () => {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        window.location.reload();
+      },
+    }}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+
+const useApp = () => useContext(AppContext);
+
+// ═══════════════════════════════════════════════════
+// REUSABLE UI COMPONENTS
+// ═══════════════════════════════════════════════════
+
+// Toast System
+const ToastContainer = () => {
+  const { toasts } = useApp();
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const colors = { success: '#16A34A', error: '#DC2626', warning: '#D97706', info: '#0EA5E9' };
+  return (
+    <div className="toast-container">
+      {toasts.map(t => (
+        <div key={t.id} className={`toast toast-${t.type}`}>
+          <div style={{ width: 20, height: 20, borderRadius: '50%', background: colors[t.type], color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{icons[t.type]}</div>
+          <div>
+            <div className="toast-message">{t.message}</div>
+            {t.sub && <div className="toast-sub">{t.sub}</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Confirm Dialog
+const ConfirmDialog = ({ open, title, message, icon, confirmLabel = 'Confirm', confirmClass = 'btn-primary', onConfirm, onCancel, children }) => {
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onCancel?.(); };
+    if (open) document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onCancel]);
+  if (!open) return null;
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-body" style={{ textAlign: 'center', padding: '32px 24px 20px' }}>
+          {icon && (
+            <div style={{ marginBottom: 16, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              {typeof icon === 'string' && ['approve','reject','activate','deactivate','deliver','pay','invoice_gen','send','warning_tri','export_csv'].includes(icon)
+                ? <div style={{ width:56, height:56, borderRadius:14, background:'var(--primary-light)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--primary)' }}><Icon name={icon} size={26} /></div>
+                : <div style={{ fontSize: 40 }}>{icon}</div>
+              }
+            </div>
+          )}
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>{title}</div>
+          <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{message}</div>
+          {children}
+        </div>
+        <div className="modal-footer" style={{ justifyContent: 'center', gap: 12 }}>
+          <button className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+          <button className={`btn ${confirmClass}`} onClick={onConfirm}>{confirmLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Status Badge
+const StatusBadge = ({ status }) => {
+  const cls = getStatusBadgeClass(status);
+  return (
+    <span className={`badge ${cls}`}>
+      <span className="badge-dot"></span>
+      {status}
+    </span>
+  );
+};
+
+// Metric Card
+const MetricCard = ({ label, value, icon, iconBg, iconColor, change, changePct, sub, isLarge }) => (
+  <div className="metric-card">
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: isLarge ? 22 : 28, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{value}</div>
+        {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>{sub}</div>}
+      </div>
+      {icon && (
+        <div style={{ width: 42, height: 42, borderRadius: 8, background: iconBg || 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor || 'var(--primary)', flexShrink: 0 }}>
+          <Icon name={icon} size={20} />
+        </div>
+      )}
+    </div>
+    {changePct !== undefined && (
+      <div style={{ fontSize: 11.5, marginTop: 8, color: changePct >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>
+        <span>{changePct >= 0 ? '↑' : '↓'} {Math.abs(changePct)}%</span>
+        <span style={{ color: 'var(--text-muted)', fontWeight: 400, marginLeft: 4 }}>{change || 'vs last month'}</span>
+      </div>
+    )}
+  </div>
+);
+
+
+// Data Table with pagination
+const DataTable = ({ columns, data, loading, emptyIcon, emptyTitle, emptySub, emptyAction, pageSize = 10, searchQuery = '' }) => {
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [data.length, searchQuery]);
+  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
+  const paged = data.slice((page - 1) * pageSize, page * pageSize);
+
+  if (loading) return (
+    <div style={{ padding: '0 0 16px' }}>
+      {Array.from({ length: 5 }).map((_, i) => (
