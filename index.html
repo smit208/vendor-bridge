@@ -1367,4 +1367,1373 @@ const DataTable = ({ columns, data, loading, emptyIcon, emptyTitle, emptySub, em
 
   if (loading) return (
     <div style={{ padding: '0 0 16px' }}>
-      {Array.from({ length: 5 }).map((_, i) => (
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+          {columns.map((_, j) => <div key={j} className="skeleton" style={{ height: 16, flex: 1, borderRadius: 4 }} />)}
+        </div>
+      ))}
+    </div>
+  );
+
+  if (!data.length) return (
+    <div className="empty-state">
+      <div className="empty-state-icon">{emptyIcon || <span style={{ fontSize: 48 }}>📋</span>}</div>
+      <div className="empty-state-title">{emptyTitle || 'No data found'}</div>
+      <div className="empty-state-sub">{emptySub || 'Nothing to display here yet.'}</div>
+      {emptyAction}
+    </div>
+  );
+
+  return (
+    <>
+      <div style={{ overflowX: 'auto' }}>
+        <table className="data-table">
+          <thead>
+            <tr>{columns.map(col => <th key={col.key} style={col.style}>{col.label}</th>)}</tr>
+          </thead>
+          <tbody>
+            {paged.map((row, ri) => (
+              <tr key={row.id || ri} onClick={row._onClick} style={row._onClick ? { cursor: 'pointer' } : {}}>
+                {columns.map(col => (
+                  <td key={col.key} style={col.cellStyle}>
+                    {col.render ? col.render(row) : row[col.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, data.length)} of {data.length}
+          </span>
+          <div className="pagination">
+            <button className="page-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>‹</button>
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button key={i} className={`page-btn${page === i + 1 ? ' active' : ''}`} onClick={() => setPage(i + 1)}>
+                {i + 1}
+              </button>
+            ))}
+            <button className="page-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+// Avatar
+const Avatar = ({ name, size = 34 }) => (
+  <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.38, background: getAvatarColor(name || 'U') }}>
+    {getInitials(name)}
+  </div>
+);
+
+// Quick Action Card
+const QuickAction = ({ icon, label, color = 'var(--primary)', onClick }) => (
+  <div className="quick-action" onClick={onClick} style={{ cursor: 'pointer' }}>
+    <div className="quick-action-icon" style={{ background: color + '18', color }}>
+      <Icon name={icon} size={15} />
+    </div>
+    <span className="quick-action-label">{label}</span>
+    <span style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}><Icon name="arrow_right" size={13} /></span>
+  </div>
+);
+
+
+// ═══════════════════════════════════════════════════
+// SIDEBAR & HEADER (LAYOUT)
+// ═══════════════════════════════════════════════════
+
+// ── ICON COMPONENT (clean Lucide-style SVGs) ─────────
+const ICONS = {
+  dashboard: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>),
+  vendors:   (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>),
+  rfqs:      (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>),
+  quotations:(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>),
+  comparison:(<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>),
+  approvals: (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>),
+  pos:       (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>),
+  invoices:  (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>),
+  logs:      (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>),
+  reports:   (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>),
+  users:     (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>),
+  bell:      (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>),
+  menu:      (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>),
+  logout:    (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>),
+  chevron:   (<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>),
+  notif_rfq: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>),
+  notif_quo: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>),
+  notif_apr: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>),
+  notif_po:  (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>),
+  notif_inv: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/></svg>),
+  // metric card icons
+  ic_vendors:  (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>),
+  ic_rfq:      (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>),
+  ic_quotation:(<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>),
+  ic_approval: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>),
+  ic_po:       (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>),
+  ic_invoice:  (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>),
+  ic_spend:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>),
+  ic_time:     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>),
+  ic_check:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>),
+  ic_x:        (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>),
+  ic_trend:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>),
+  // quick action icons
+  qa_add:      (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>),
+  qa_rfq:      (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>),
+  qa_compare:  (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>),
+  qa_po:       (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>),
+  qa_invoice:  (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/></svg>),
+  qa_approval: (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>),
+  qa_user:     (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>),
+  qa_report:   (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>),
+  qa_log:      (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>),
+  qa_quote:    (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>),
+  arrow_right: (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>),
+  search:      (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>),
+  close:       (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>),
+  activity:    (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>),
+  download:    (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>),
+  filter:      (<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>),
+  edit:        (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>),
+  eye:         (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>),
+  send:        (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>),
+  print:       (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>),
+  trash:       (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>),
+  vendor:      (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>),
+  check_sm:    (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>),
+  x_sm:        (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>),
+  // ── clean action icons (replaces emoji buttons) ──────────────────────────
+  approve:     (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>),
+  reject:      (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>),
+  activate:    (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>),
+  deactivate:  (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>),
+  deliver:     (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>),
+  pay:         (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>),
+  invoice_gen: (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>),
+  export_csv:  (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>),
+  export_pdf:  (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 15h6"/><path d="M9 18h3"/></svg>),
+  warning_tri: (<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>),
+};
+
+const Icon = ({ name, size = 16, color }) => {
+  const icon = ICONS[name];
+  if (!icon) return null;
+  return React.cloneElement(icon, { width: size, height: size, style: color ? { color } : undefined });
+};
+const NAV_CONFIG = {
+  [ROLES.ADMIN]: [
+    { key: 'dashboard', label: 'Dashboard',      icon: 'dashboard' },
+    { key: 'vendors',   label: 'Vendors',         icon: 'vendors'   },
+    { key: 'rfqs',      label: 'RFQs',            icon: 'rfqs'      },
+    { key: 'quotations',label: 'Quotations',      icon: 'quotations'},
+    { key: 'approvals', label: 'Approvals',       icon: 'approvals', badge: true },
+    { key: 'pos',       label: 'Purchase Orders', icon: 'pos'       },
+    { key: 'invoices',  label: 'Invoices',        icon: 'invoices'  },
+    { key: 'logs',      label: 'Activity Logs',   icon: 'logs'      },
+    { key: 'reports',   label: 'Reports',         icon: 'reports'   },
+    { key: 'users',     label: 'Settings',        icon: 'users'     },
+  ],
+  [ROLES.OFFICER]: [
+    { key: 'dashboard', label: 'Dashboard',      icon: 'dashboard' },
+    { key: 'vendors',   label: 'Vendors',         icon: 'vendors'   },
+    { key: 'rfqs',      label: 'RFQs',            icon: 'rfqs'      },
+    { key: 'quotations',label: 'Quotations',      icon: 'quotations'},
+    { key: 'comparison',label: 'Comparison',      icon: 'comparison'},
+    { key: 'pos',       label: 'Purchase Orders', icon: 'pos'       },
+    { key: 'invoices',  label: 'Invoices',        icon: 'invoices'  },
+    { key: 'logs',      label: 'Activity Logs',   icon: 'logs'      },
+    { key: 'reports',   label: 'Reports',         icon: 'reports'   },
+  ],
+  [ROLES.VENDOR]: [
+    { key: 'dashboard',       label: 'Dashboard',      icon: 'dashboard' },
+    { key: 'vendor-rfqs',     label: 'My RFQs',         icon: 'rfqs'      },
+    { key: 'my-quotations',   label: 'My Quotations',   icon: 'quotations'},
+    { key: 'vendor-pos',      label: 'Purchase Orders', icon: 'pos'       },
+    { key: 'vendor-invoices', label: 'My Invoices',     icon: 'invoices'  },
+  ],
+  [ROLES.MANAGER]: [
+    { key: 'dashboard', label: 'Dashboard',       icon: 'dashboard' },
+    { key: 'approvals', label: 'Approvals',       icon: 'approvals', badge: true },
+    { key: 'rfqs',      label: 'RFQ Overview',    icon: 'rfqs'      },
+    { key: 'pos',       label: 'Purchase Orders', icon: 'pos'       },
+    { key: 'reports',   label: 'Reports',         icon: 'reports'   },
+    { key: 'logs',      label: 'Activity Logs',   icon: 'logs'      },
+  ],
+};
+
+const Sidebar = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
+  const { currentUser, currentPage, setCurrentPage, pendingApprovalsCount } = useApp();
+  if (!currentUser) return null;
+  const navItems = NAV_CONFIG[currentUser.role] || [];
+  const isMobile = window.innerWidth <= 768;
+
+  const handleNavClick = (key) => {
+    setCurrentPage(key);
+    if (isMobile) setMobileOpen(false);
+  };
+
+  return (
+    <>
+      {/* Overlay backdrop — mobile only, closes drawer on tap */}
+      {isMobile && mobileOpen && (
+        <div className="sidebar-overlay" onClick={() => setMobileOpen(false)} />
+      )}
+      <aside className={`sidebar${collapsed && !isMobile ? ' collapsed' : ''}${isMobile && mobileOpen ? ' mobile-open' : ''}`}>
+        {/* ── Top: Logo + collapse toggle ── */}
+        <div className="sidebar-logo" style={{
+          justifyContent: collapsed && !isMobile ? 'center' : 'space-between',
+          cursor: 'default',
+          padding: '0 12px',
+        }}>
+          {/* VB logo — hidden when collapsed on desktop */}
+          {(!collapsed || isMobile) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <img src="/logo.png" alt="VendorBridge" style={{ width: 30, height: 30, borderRadius: 7, flexShrink: 0, objectFit: 'cover' }} />
+              <div className="sidebar-logo-text">VendorBridge</div>
+            </div>
+          )}
+          {/* Collapse toggle — desktop only */}
+          {!isMobile && (
+            <button
+              onClick={() => setCollapsed(c => !c)}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                border: '1px solid var(--border)',
+                background: 'var(--surface)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text-secondary)', flexShrink: 0,
+                transition: 'all 150ms',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--primary-light)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{ transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform 220ms cubic-bezier(0.4,0,0.2,1)' }}>
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+        </div>
+        <nav className="sidebar-nav">
+          {navItems.map(item => (
+            <div
+              key={item.key}
+              className={`nav-item${currentPage === item.key ? ' active' : ''}`}
+              onClick={() => handleNavClick(item.key)}
+              title={item.label}
+            >
+              <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                <Icon name={item.icon} size={16} />
+              </span>
+              {(!collapsed || isMobile) && <span className="nav-item-label">{item.label}</span>}
+              {(!collapsed || isMobile) && item.badge && pendingApprovalsCount > 0 && (
+                <span className="nav-badge">{pendingApprovalsCount}</span>
+              )}
+            </div>
+          ))}
+        </nav>
+        {(!collapsed || isMobile) && <div className="sidebar-footer">VendorBridge v1.0.0</div>}
+      </aside>
+    </>
+  );
+};
+
+const NotificationBell = () => {
+  const { userNotifications, unreadCount, markAllRead } = useApp();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  const typeIconName = { rfq: 'notif_rfq', quotation: 'notif_quo', approval: 'notif_apr', po: 'notif_po', invoice: 'notif_inv' };
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <button className="btn-icon btn-secondary" onClick={() => setOpen(o => !o)} style={{ position: 'relative', border: '1px solid var(--border)' }}>
+        <Icon name="bell" size={16} />
+        {unreadCount > 0 && (
+          <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--danger)', color: 'white', fontSize: 9, fontWeight: 700, minWidth: 15, height: 15, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{unreadCount}</span>
+        )}
+      </button>
+      {open && (
+        <div className="notif-dropdown">
+          <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontWeight: 600, fontSize: 13 }}>Notifications</span>
+            {unreadCount > 0 && <button className="btn btn-sm btn-secondary" onClick={markAllRead}>Mark all read</button>}
+          </div>
+          <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+            {userNotifications.slice(0, 10).map(n => (
+              <div key={n.id} className={`notif-item${n.read ? '' : ' unread'}`}>
+                <span style={{ flexShrink:0, display:'flex', alignItems:'center', width:26, height:26, borderRadius:5, background:'var(--primary-light)', justifyContent:'center', color:'var(--primary)' }}>
+                  <Icon name={typeIconName[n.type] || 'bell'} size={13} />
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: n.read ? 400 : 500 }}>{n.message}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{timeAgo(n.time)}</div>
+                </div>
+                {!n.read && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, marginTop: 4 }}></div>}
+              </div>
+            ))}
+            {userNotifications.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>No notifications</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ProfileDropdown = () => {
+  const { currentUser, logout } = useApp();
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+  const roleColors = { [ROLES.ADMIN]: '#DC2626', [ROLES.OFFICER]: '#1B4FD8', [ROLES.VENDOR]: '#16A34A', [ROLES.MANAGER]: '#D97706' };
+  const isMobile = window.innerWidth <= 768;
+  return (
+    <div style={{ position: 'relative' }} ref={ref}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 6px', borderRadius: 8 }} onClick={() => setOpen(o => !o)}>
+        <Avatar name={currentUser?.name} size={30} />
+        {!isMobile && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>{currentUser?.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{currentUser?.role}</div>
+          </div>
+        )}
+        {!isMobile && <span style={{ display:'flex', alignItems:'center', color:'var(--text-muted)' }}><Icon name="chevron" size={12} /></span>}
+      </div>
+      {open && (
+        <div className="profile-dropdown">
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>{currentUser?.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{currentUser?.email}</div>
+            <span style={{ display: 'inline-block', marginTop: 6, padding: '2px 8px', borderRadius: 12, background: (roleColors[currentUser?.role] || '#1B4FD8') + '18', color: roleColors[currentUser?.role] || '#1B4FD8', fontSize: 11, fontWeight: 600 }}>{currentUser?.role}</span>
+          </div>
+          <div className="profile-dropdown-item danger" onClick={() => { logout(); setOpen(false); }}>
+            <Icon name="logout" size={14} /> Sign Out
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Header = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
+  const { currentPage } = useApp();
+  const isMobile = window.innerWidth <= 768;
+  const pageLabels = {
+    dashboard: 'Dashboard', vendors: 'Vendor Management', rfqs: 'RFQ Management',
+    quotations: 'Quotations', comparison: 'Quotation Comparison', approvals: 'Approvals',
+    pos: 'Purchase Orders', invoices: 'Invoices', logs: 'Activity Logs',
+    reports: 'Reports & Analytics', users: 'User Management',
+    'vendor-rfqs': 'My RFQs', 'my-quotations': 'My Quotations',
+    'vendor-pos': 'My Purchase Orders', 'vendor-invoices': 'My Invoices',
+  };
+  return (
+    <header className={`header${!isMobile && collapsed ? ' sidebar-collapsed' : ''}`}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Mobile only: hamburger opens the slide-over drawer */}
+        {isMobile && (
+          <button className="btn-icon btn-secondary"
+            onClick={() => setMobileOpen(o => !o)}
+            style={{ border: '1px solid var(--border)', flexShrink: 0 }}>
+            <Icon name="menu" size={16} />
+          </button>
+        )}
+        <h1 style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: isMobile ? 160 : 'none' }}>
+          {pageLabels[currentPage] || 'VendorBridge'}
+        </h1>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <NotificationBell />
+        <div style={{ width: 1, height: 22, background: 'var(--border)' }}></div>
+        <ProfileDropdown />
+      </div>
+    </header>
+  );
+};
+
+// Mobile Bottom Nav — shows 5 key shortcuts at bottom on phones
+const MobileBottomNav = () => {
+  const { currentUser, currentPage, setCurrentPage, pendingApprovalsCount } = useApp();
+  if (!currentUser) return null;
+  const items = (NAV_CONFIG[currentUser.role] || []).slice(0, 5);
+  return (
+    <nav className="mobile-bottom-nav">
+      {items.map(item => (
+        <div
+          key={item.key}
+          onClick={() => setCurrentPage(item.key)}
+          style={{
+            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', gap: 3, cursor: 'pointer', padding: '6px 2px',
+            color: currentPage === item.key ? 'var(--primary)' : 'var(--text-muted)',
+            transition: 'color 120ms',
+          }}
+        >
+          <div style={{ position: 'relative' }}>
+            <Icon name={item.icon} size={18} />
+            {item.badge && pendingApprovalsCount > 0 && (
+              <span style={{ position:'absolute', top:-4, right:-4, background:'var(--danger)', color:'white', fontSize:8, fontWeight:700, minWidth:13, height:13, borderRadius:7, display:'flex', alignItems:'center', justifyContent:'center' }}>{pendingApprovalsCount}</span>
+            )}
+          </div>
+          <span style={{ fontSize: 9.5, fontWeight: currentPage === item.key ? 600 : 400, lineHeight: 1 }}>{item.label.split(' ')[0]}</span>
+        </div>
+      ))}
+    </nav>
+  );
+};
+
+const Layout = ({ children }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  // Close drawer on resize to desktop
+  useEffect(() => {
+    const onResize = () => { if (window.innerWidth > 768) setMobileOpen(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return (
+    <div>
+      <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <Header collapsed={collapsed} setCollapsed={setCollapsed} mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <main className={`main-content${collapsed && window.innerWidth > 768 ? ' sidebar-collapsed' : ''}`}>{children}</main>
+      <MobileBottomNav />
+    </div>
+  );
+};
+
+
+// ═══════════════════════════════════════════════════
+// LOGIN SCREEN
+// ═══════════════════════════════════════════════════
+
+const LoginScreen = () => {
+  const { login, showToast, signup } = useApp();
+  const [tab, setTab] = useState('login');
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', confirm: '', role: ROLES.OFFICER });
+  const [signupErrors, setSignupErrors] = useState({});
+
+  const demoUsers = [
+    { label: 'Admin', email: 'admin@vendorbridge.com', password: 'admin123', color: '#DC2626', icon: 'users' },
+    { label: 'Officer', email: 'officer@vendorbridge.com', password: 'officer123', color: '#1B4FD8', icon: 'pos' },
+    { label: 'Vendor', email: 'vendor@vendorbridge.com', password: 'vendor123', color: '#16A34A', icon: 'vendor' },
+    { label: 'Manager', email: 'manager@vendorbridge.com', password: 'manager123', color: '#D97706', icon: 'approvals' },
+  ];
+
+  const handleLogin = async (e) => {
+    e?.preventDefault();
+    const errs = {};
+    if (!form.email) errs.email = 'Email is required';
+    else if (!validateEmail(form.email)) errs.email = 'Enter a valid email';
+    if (!form.password) errs.password = 'Password is required';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 500));
+    const user = login(form.email, form.password);
+    setLoading(false);
+    if (!user) { setErrors({ form: 'Invalid email or password.' }); showToast('Invalid email or password', 'error'); }
+  };
+
+  const handleDemoLogin = async (demo) => {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 400));
+    login(demo.email, demo.password);
+    setLoading(false);
+  };
+
+  const handleSignup = (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!signupForm.name.trim()) errs.name = 'Full name is required';
+    if (!signupForm.email) errs.email = 'Email is required';
+    else if (!validateEmail(signupForm.email)) errs.email = 'Enter a valid email';
+    if (!signupForm.password) errs.password = 'Password is required';
+    else if (signupForm.password.length < 6) errs.password = 'Min. 6 characters';
+    if (signupForm.password !== signupForm.confirm) errs.confirm = 'Passwords do not match';
+    setSignupErrors(errs);
+    if (Object.keys(errs).length) return;
+    const res = signup({ name: signupForm.name, email: signupForm.email, password: signupForm.password, role: signupForm.role });
+    if (res.error) { setSignupErrors({ email: res.error }); return; }
+    // signup() auto-logs in the new user — dashboard will render immediately
+    showToast(`Welcome, ${signupForm.name}! Account created.`, 'success');
+    // No need to redirect — currentUser is now set, app renders dashboard
+  };
+
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div className="login-left" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, minWidth: 0 }}>
+        <div style={{ maxWidth: 380, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 36 }}>
+            <img src="/logo.png" alt="VendorBridge" style={{ width: 44, height: 44, borderRadius: 12, objectFit: 'cover' }} />
+            <div>
+              <div style={{ color: 'white', fontSize: 22, fontWeight: 600 }}>VendorBridge</div>
+              <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>Procurement & Vendor Management ERP</div>
+            </div>
+          </div>
+          <div style={{ color: 'white', fontSize: 30, fontWeight: 600, lineHeight: 1.3, marginBottom: 14 }}>Procurement,<br />Simplified.</div>
+          <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, lineHeight: 1.75, marginBottom: 32 }}>
+            Manage vendors, create RFQs, compare quotations, and generate purchase orders — all in one platform built for modern procurement teams.
+          </div>
+          {['Vendor Management','RFQ Workflows','Quotation Comparison','Approval Workflows','Invoice Generation','Analytics & Reports'].map(f => (
+            <div key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, margin: '0 6px 8px 0', padding: '5px 12px', borderRadius: 20, background: 'rgba(255,255,255,0.12)', color: 'white', fontSize: 12, fontWeight: 500 }}>
+              <span style={{ color: '#86efac' }}>✓</span> {f}
+            </div>
+          ))}
+          <div style={{ marginTop: 40 }}>
+            <svg width="100%" height="120" viewBox="0 0 360 120" fill="none">
+              <rect x="8" y="16" width="96" height="68" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" strokeWidth="1"/>
+              <rect x="18" y="28" width="56" height="6" rx="3" fill="rgba(255,255,255,0.3)"/>
+              <rect x="18" y="40" width="36" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+              <rect x="18" y="50" width="66" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+              <rect x="18" y="60" width="46" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+              <rect x="18" y="72" width="76" height="1" rx="1" fill="rgba(255,255,255,0.1)"/>
+              <line x1="104" y1="50" x2="132" y2="50" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="4 3"/>
+              <circle cx="118" cy="50" r="5" fill="rgba(255,255,255,0.2)"/>
+              <rect x="132" y="8" width="116" height="88" rx="8" fill="rgba(255,255,255,0.13)" stroke="rgba(255,255,255,0.22)" strokeWidth="1"/>
+              <rect x="144" y="20" width="72" height="7" rx="3" fill="rgba(255,255,255,0.4)"/>
+              <rect x="144" y="34" width="52" height="4" rx="2" fill="rgba(255,255,255,0.2)"/>
+              <rect x="144" y="44" width="86" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+              <rect x="144" y="54" width="62" height="4" rx="2" fill="rgba(255,255,255,0.15)"/>
+              <rect x="144" y="68" width="94" height="18" rx="4" fill="rgba(255,255,255,0.15)"/>
+              <line x1="248" y1="50" x2="272" y2="50" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" strokeDasharray="4 3"/>
+              <circle cx="260" cy="50" r="5" fill="rgba(255,255,255,0.2)"/>
+              <rect x="272" y="24" width="80" height="56" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.12)" strokeWidth="1"/>
+              <rect x="282" y="36" width="46" height="5" rx="2" fill="rgba(255,255,255,0.25)"/>
+              <rect x="282" y="47" width="60" height="4" rx="2" fill="rgba(255,255,255,0.12)"/>
+              <rect x="282" y="57" width="50" height="4" rx="2" fill="rgba(255,255,255,0.12)"/>
+              <rect x="282" y="67" width="42" height="6" rx="3" fill="#86efac" opacity="0.6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 48px', background: 'var(--surface)', overflowY: 'auto', minWidth: 0 }}>
+        <div style={{ maxWidth: 440, width: '100%' }}>
+          <div className="tabs" style={{ marginBottom: 28 }}>
+            <div className={`tab${tab === 'login' ? ' active' : ''}`} onClick={() => setTab('login')}>Sign In</div>
+            <div className={`tab${tab === 'signup' ? ' active' : ''}`} onClick={() => setTab('signup')}>Create Account</div>
+          </div>
+
+          {tab === 'login' ? (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>Welcome back</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Sign in to your VendorBridge account</p>
+              </div>
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Email Address <span className="req">*</span></label>
+                  <input className={`form-input${errors.email ? ' error' : ''}`} type="email" placeholder="you@company.com" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                  {errors.email && <span className="form-error">{errors.email}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Password <span className="req">*</span></label>
+                  <div style={{ position: 'relative' }}>
+                    <input className={`form-input${errors.password ? ' error' : ''}`} type={showPw ? 'text' : 'password'} placeholder="Enter password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} style={{ paddingRight: 44 }} />
+                    <button type="button" onClick={() => setShowPw(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16 }}>{showPw ? '🙈' : '👁'}</button>
+                  </div>
+                  {errors.password && <span className="form-error">{errors.password}</span>}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: 13, cursor: 'pointer', fontWeight: 500 }} onClick={() => setForgotOpen(true)}>Forgot password?</button>
+                </div>
+                {errors.form && <div style={{ padding: '10px 14px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 6, color: '#991B1B', fontSize: 13 }}>{errors.form}</div>}
+                <button className="btn btn-primary" type="submit" disabled={loading || !form.email || !form.password} style={{ height: 42, fontSize: 15 }}>
+                  {loading ? <><div className="spinner"></div>&nbsp;Signing in...</> : 'Sign In'}
+                </button>
+              </form>
+              <div style={{ margin: '24px 0 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }}></div>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.5px' }}>QUICK DEMO ACCESS</span>
+                <div style={{ flex: 1, height: 1, background: 'var(--border)' }}></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {demoUsers.map(d => (
+                  <button key={d.label} onClick={() => handleDemoLogin(d)} disabled={loading} style={{ padding: '10px 12px', border: `1px solid ${d.color}33`, borderRadius: 8, background: d.color + '0a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 150ms', fontFamily: 'DM Sans, sans-serif' }}>
+                    <span style={{ fontSize: 18 }}>{d.icon}</span>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: d.color }}>{d.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{d.email.split('@')[0]}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 16, padding: 14, background: 'white', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600, letterSpacing: '0.5px' }}>DEMO CREDENTIALS</div>
+                {demoUsers.map(d => (
+                  <div key={d.label} style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, fontFamily: 'DM Mono, monospace', display: 'flex', gap: 8 }}>
+                    <span style={{ color: d.color, fontWeight: 600, minWidth: 60 }}>[{d.label}]</span>
+                    <span>{d.email} / {d.password}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom: 24 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>Create account</h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Join VendorBridge to manage procurement</p>
+              </div>
+              <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">Full Name <span className="req">*</span></label>
+                  <input className={`form-input${signupErrors.name ? ' error' : ''}`} type="text" placeholder="Rahul Mehta" value={signupForm.name} onChange={e => setSignupForm(f => ({ ...f, name: e.target.value }))} />
+                  {signupErrors.name && <span className="form-error">{signupErrors.name}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email Address <span className="req">*</span></label>
+                  <input className={`form-input${signupErrors.email ? ' error' : ''}`} type="email" placeholder="you@company.com" value={signupForm.email} onChange={e => setSignupForm(f => ({ ...f, email: e.target.value }))} />
+                  {signupErrors.email && <span className="form-error">{signupErrors.email}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Role <span className="req">*</span></label>
+                  <select className="form-select" value={signupForm.role} onChange={e => setSignupForm(f => ({ ...f, role: e.target.value }))}>
+                    <option value={ROLES.OFFICER}>Procurement Officer</option>
+                    <option value={ROLES.VENDOR}>Vendor</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Password <span className="req">*</span></label>
+                  <input className={`form-input${signupErrors.password ? ' error' : ''}`} type="password" placeholder="Min. 6 characters" value={signupForm.password} onChange={e => setSignupForm(f => ({ ...f, password: e.target.value }))} />
+                  {signupErrors.password && <span className="form-error">{signupErrors.password}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Confirm Password <span className="req">*</span></label>
+                  <input className={`form-input${signupErrors.confirm ? ' error' : ''}`} type="password" placeholder="Repeat password" value={signupForm.confirm} onChange={e => setSignupForm(f => ({ ...f, confirm: e.target.value }))} />
+                  {signupErrors.confirm && <span className="form-error">{signupErrors.confirm}</span>}
+                </div>
+                <button className="btn btn-primary" type="submit" style={{ height: 42, fontSize: 15, marginTop: 4 }}>Create Account</button>
+              </form>
+            </>
+          )}
+        </div>
+      </div>
+
+      {forgotOpen && (
+        <div className="modal-overlay" onClick={() => { setForgotOpen(false); setForgotSent(false); setForgotEmail(''); }}>
+          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">Reset Password</span>
+              <button className="btn-icon btn-secondary" onClick={() => { setForgotOpen(false); setForgotSent(false); setForgotEmail(''); }}><Icon name="close" size={14} /></button>
+            </div>
+            <div className="modal-body">
+              {forgotSent ? (
+                <div style={{ textAlign: 'center', padding: '16px 0' }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>📧</div>
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>Reset link sent!</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>If an account exists for <strong>{forgotEmail}</strong>, a reset link has been sent.</div>
+                </div>
+              ) : (
+                <>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 16 }}>Enter your email to receive a password reset link.</p>
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input className="form-input" type="email" placeholder="you@company.com" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} />
+                  </div>
+                </>
+              )}
+            </div>
+            {!forgotSent && (
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => { setForgotOpen(false); setForgotEmail(''); }}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => { if (forgotEmail) setForgotSent(true); }} disabled={!forgotEmail}>Send Reset Link</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// CHART COMPONENT
+// ═══════════════════════════════════════════════════
+
+const ChartComponent = ({ type, data, options, height = 260 }) => {
+  const canvasRef = useRef(null);
+  const chartRef = useRef(null);
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    chartRef.current = new Chart(canvasRef.current, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { family: 'DM Sans', size: 12 }, color: '#475569' } }, tooltip: { titleFont: { family: 'DM Sans' }, bodyFont: { family: 'DM Sans' } } }, ...options } });
+    return () => { if (chartRef.current) chartRef.current.destroy(); };
+  }, [JSON.stringify(data)]);
+  return <div style={{ height }}><canvas ref={canvasRef}></canvas></div>;
+};
+
+
+// ── Shared: LiveActivityFeed (real logs → colored tags) ────────────────────
+const ACTION_TAG = {
+  CREATE:  { tag: 'Created',  color: '#875A7B' },
+  UPDATE:  { tag: 'Updated',  color: '#5B9BD5' },
+  SEND:    { tag: 'Sent',     color: '#00A09D' },
+  APPROVE: { tag: 'Approved', color: '#16A34A' },
+  REJECT:  { tag: 'Rejected', color: '#D9534F' },
+  DELETE:  { tag: 'Deleted',  color: '#D9534F' },
+  LOGIN:   { tag: 'Login',    color: '#875A7B' },
+  SUBMIT:  { tag: 'Submitted',color: '#F0AD00' },
+  COMPARE: { tag: 'Compared', color: '#5B9BD5' },
+  SELECT:  { tag: 'Selected', color: '#5B9BD5' },
+  CLOSE:   { tag: 'Closed',   color: '#6C757D' },
+};
+const ENTITY_TAG = {
+  RFQ:         { tag: 'RFQ',       color: '#00A09D' },
+  Vendor:      { tag: 'Vendor',    color: '#875A7B' },
+  VENDOR:      { tag: 'Vendor',    color: '#875A7B' },
+  Quotation:   { tag: 'Quotation', color: '#5B9BD5' },
+  QUOTATION:   { tag: 'Quotation', color: '#5B9BD5' },
+  Approval:    { tag: 'Approval',  color: '#F0AD00' },
+  APPROVAL:    { tag: 'Approval',  color: '#F0AD00' },
+  PO:          { tag: 'PO',        color: '#16A34A' },
+  Invoice:     { tag: 'Invoice',   color: '#5B9BD5' },
+  INVOICE:     { tag: 'Invoice',   color: '#5B9BD5' },
+  User:        { tag: 'User',      color: '#875A7B' },
+  USER:        { tag: 'User',      color: '#875A7B' },
+};
+
+const LiveActivityFeed = ({ logs, limit = 6 }) => {
+  const feed = logs.slice(0, limit);
+  if (feed.length === 0) return (
+    <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+      No recent activity yet.
+    </div>
+  );
+  return (
+    <div style={{ padding: '6px 0' }}>
+      {feed.map((log, i) => {
+        const et = ENTITY_TAG[log.entityType] || { tag: log.entityType || 'Action', color: '#875A7B' };
+        return (
+          <div key={log.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 18px', borderBottom: i < feed.length-1 ? '1px solid var(--border-lt)' : 'none' }}>
+            <span style={{ width:30, height:30, borderRadius:'50%', background: et.color + '18', border: '1px solid ' + et.color + '33', display:'flex', alignItems:'center', justifyContent:'center', color: et.color, flexShrink:0 }}>
+              <Icon name="activity" size={13} />
+            </span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13.5, fontWeight:500, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{log.details}</div>
+              <div style={{ fontSize:11.5, color:'var(--text-muted)', marginTop:1 }}>{log.userName} · {log.timestamp}</div>
+            </div>
+            <span style={{ padding:'2px 10px', borderRadius:4, background: et.color + '18', color: et.color, fontSize:11.5, fontWeight:600, flexShrink:0, whiteSpace:'nowrap' }}>{et.tag}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// DASHBOARD SCREENS
+// ═══════════════════════════════════════════════════
+
+const AdminDashboard = () => {
+  const { vendors, rfqs, quotations, pos, invoices, logs, approvals, setCurrentPage } = useApp();
+  const totalSpend = invoices.reduce((s, inv) => s + (inv.grandTotal || 0), 0);
+  const activeRfqs  = rfqs.filter(r => !['Draft','Closed'].includes(r.status)).length;
+  const pendingAppr = approvals.filter(a => a.status === 'Pending').length;
+  const activeVends = vendors.filter(v => v.status === 'Active').length;
+  const invoicesSent= invoices.filter(i => i.status === 'Sent').length;
+
+  const monthlySpend = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [{ label: 'Procurement Spend (₹)', data: [280000, 450000, 320000, 1417180, 278834, 95000], backgroundColor: '#875A7B', borderRadius: 4 }]
+  };
+  const categoryData = {
+    labels: ['IT', 'Logistics', 'Office Supplies', 'Construction', 'Services'],
+    datasets: [{ data: [35, 20, 25, 10, 10], backgroundColor: ['#875A7B','#5B9BD5','#00A09D','#F0AD00','#9B6B8E'] }]
+  };
+
+  const quickActions = [
+    { icon: 'qa_add',      label: 'Add Vendor',        page: 'vendors'    },
+    { icon: 'qa_rfq',      label: 'Create RFQ',         page: 'rfqs'       },
+    { icon: 'qa_compare',  label: 'Compare Quotations', page: 'comparison' },
+    { icon: 'qa_approval', label: 'Pending Approvals',  page: 'approvals'  },
+    { icon: 'qa_invoice',  label: 'Generate Invoice',   page: 'invoices'   },
+  ];
+
+  const spendDisplay = totalSpend >= 100000
+    ? '₹' + (totalSpend/100000).toFixed(2).replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ' L'
+    : '₹' + totalSpend.toLocaleString('en-IN');
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 3, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Dashboard</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Procurement overview & quick actions</p>
+      </div>
+
+      {/* ── Row 1: 4 metric cards ── */}
+      <div className="grid-4" style={{ marginBottom: 16 }}>
+        <MetricCard label="TOTAL VENDORS"     value={vendors.length}    icon="ic_vendors"   iconColor="#875A7B" iconBg="#F3EEF2" />
+        <MetricCard label="ACTIVE RFQS"       value={activeRfqs}        icon="ic_rfq"       iconColor="#5B9BD5" iconBg="#EBF5FF" />
+        <MetricCard label="QUOTATIONS"        value={quotations.length} icon="ic_quotation" iconColor="#D9534F" iconBg="#FDECEA" />
+        <MetricCard label="PENDING APPROVALS" value={pendingAppr}       icon="ic_approval"  iconColor="#F0AD00" iconBg="#FFF8E1" />
+      </div>
+
+      {/* ── Row 2: 4 metric cards ── */}
+      <div className="grid-4" style={{ marginBottom: 24 }}>
+        <MetricCard label="PURCHASE ORDERS" value={pos.length}      icon="ic_po"      iconColor="#00A09D" iconBg="#E6F7F7" />
+        <MetricCard label="INVOICES"        value={invoicesSent}    icon="ic_invoice" iconColor="#5B9BD5" iconBg="#EBF5FF" />
+        <MetricCard label="MONTHLY SPEND"   value={spendDisplay}   icon="ic_spend"   iconColor="#F0AD00" iconBg="#FFF8E1" isLarge />
+        <MetricCard label="ACTIVE VENDORS"  value={activeVends}    icon="ic_vendors" iconColor="#00A09D" iconBg="#E6F7F7" />
+      </div>
+
+      {/* ── Bottom Row: Quick Actions + Recent Activity ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: 20 }}>
+        {/* Quick Actions card */}
+        <div className="card">
+          <div className="card-header"><span className="card-title">Quick Actions</span></div>
+          <div style={{ padding: '6px 0' }}>
+            {quickActions.map((qa, i) => (
+              <div key={i} onClick={() => setCurrentPage(qa.page)}
+                style={{ display:'flex', alignItems:'center', gap:13, padding:'11px 18px', cursor:'pointer', borderBottom: i < quickActions.length-1 ? '1px solid var(--border-lt)' : 'none', transition:'background 110ms' }}
+                onMouseEnter={e => e.currentTarget.style.background='var(--primary-light)'}
+                onMouseLeave={e => e.currentTarget.style.background=''}
+              >
+                <span style={{ width:31, height:31, borderRadius:6, background:'var(--surface)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)', flexShrink:0 }}>
+                  <Icon name={qa.icon} size={14} />
+                </span>
+                <span style={{ flex:1, fontSize:13.5, fontWeight:500, color:'var(--text-primary)' }}>{qa.label}</span>
+                <span style={{ color:'var(--text-muted)' }}><Icon name="arrow_right" size={13} /></span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Activity — LIVE from logs */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Recent Activity</span>
+            <span style={{ fontSize:12, color:'var(--text-muted)' }}>{logs.length} total events</span>
+          </div>
+          <LiveActivityFeed logs={logs} limit={6} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+const OfficerDashboard = () => {
+  const { rfqs, quotations, pos, invoices, logs, vendors, approvals, setCurrentPage } = useApp();
+  const pendingApprovals = approvals.filter(a => a.status === 'Pending').length;
+  const myRfqs = rfqs.filter(r => r.status !== 'Closed');
+  const pendingQuotes = quotations.filter(q => q.status === 'Submitted').length;
+  const approvedPos = pos.length;
+  const invoicesSent = invoices.filter(i => i.status === 'Sent').length;
+  const activeVendors = vendors.filter(v => v.status === 'Active').length;
+  const monthlySpend = invoices.reduce((s, i) => s + (i.grandTotal || 0), 0);
+
+  const rfqTrend = {
+    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    datasets: [{ label: 'RFQs Created', data: [2, 3, 1, 4, 2, 1], borderColor: '#875A7B', backgroundColor: 'rgba(135,90,123,0.08)', fill: true, tension: 0.4 }]
+  };
+
+  const quickActions = [
+    { icon: 'qa_add',     label: 'Add Vendor',          page: 'vendors'    },
+    { icon: 'qa_rfq',     label: 'Create RFQ',           page: 'rfqs'       },
+    { icon: 'qa_compare', label: 'Compare Quotations',   page: 'comparison' },
+    { icon: 'qa_approval',label: 'Pending Approvals',    page: 'approvals'  },
+    { icon: 'qa_invoice', label: 'Generate Invoice',     page: 'invoices'   },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 3, color: 'var(--text-primary)', letterSpacing: '-0.3px' }}>Dashboard</h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Procurement overview &amp; quick actions</p>
+      </div>
+
+      {/* ── Metric Grid ── */}
+      <div className="grid-4" style={{ marginBottom: 20 }}>
+        <MetricCard label="TOTAL VENDORS"   value={vendors.length}   icon="ic_vendors"   iconColor="#875A7B" iconBg="#F3EEF2" />
+        <MetricCard label="ACTIVE RFQS"     value={myRfqs.length}    icon="ic_rfq"       iconColor="#5B9BD5" iconBg="#EBF5FF" />
+        <MetricCard label="QUOTATIONS"      value={quotations.length} icon="ic_quotation" iconColor="#D9534F" iconBg="#FDECEA" />
+        <MetricCard label="PENDING APPROVALS" value={pendingApprovals} icon="ic_approval" iconColor="#F0AD00" iconBg="#FFF8E1" />
+      </div>
+      <div className="grid-4" style={{ marginBottom: 24 }}>
+        <MetricCard label="PURCHASE ORDERS" value={approvedPos}      icon="ic_po"        iconColor="#00A09D" iconBg="#E6F7F7" />
+        <MetricCard label="INVOICES"        value={invoicesSent}     icon="ic_invoice"   iconColor="#5B9BD5" iconBg="#EBF5FF" />
+        <MetricCard label="MONTHLY SPEND"   value={monthlySpend >= 100000 ? '₹' + (monthlySpend/100000).toFixed(1) + 'L' : '₹' + monthlySpend.toLocaleString('en-IN')} icon="ic_spend" iconColor="#F0AD00" iconBg="#FFF8E1" isLarge />
+        <MetricCard label="ACTIVE VENDORS"  value={activeVendors}   icon="ic_vendors"   iconColor="#00A09D" iconBg="#E6F7F7" />
+      </div>
+
+      {/* ── Bottom Row ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', gap: 20 }}>
+        {/* Quick Actions */}
+        <div className="card">
+          <div className="card-header"><span className="card-title">Quick Actions</span></div>
+          <div style={{ padding: '8px 0' }}>
+            {quickActions.map((qa, i) => (
+              <div key={i} onClick={() => setCurrentPage(qa.page)}
+                style={{ display:'flex', alignItems:'center', gap:14, padding:'11px 18px', cursor:'pointer', borderBottom: i < quickActions.length-1 ? '1px solid var(--border-lt)' : 'none', transition:'background 120ms ease' }}
+                onMouseEnter={e => e.currentTarget.style.background='var(--primary-light)'}
+                onMouseLeave={e => e.currentTarget.style.background=''}
+              >
+                <span style={{ width:32, height:32, borderRadius:6, background:'var(--surface)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-secondary)', flexShrink:0 }}>
+                  <Icon name={qa.icon} size={15} />
+                </span>
+                <span style={{ flex:1, fontSize:13.5, fontWeight:500, color:'var(--text-primary)' }}>{qa.label}</span>
+                <span style={{ color:'var(--text-muted)' }}><Icon name="arrow_right" size={14} /></span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recent Activity — LIVE from logs */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Recent Activity</span>
+            <span style={{ fontSize:12, color:'var(--text-muted)' }}>{logs.length} total events</span>
+          </div>
+          <LiveActivityFeed logs={logs} limit={6} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ManagerDashboard = () => {
+  const { approvals, rfqs, setCurrentPage } = useApp();
+  const pending = approvals.filter(a => a.status === 'Pending');
+  const approvedThisWeek = approvals.filter(a => a.status === 'Approved').length;
+  const rejectedThisWeek = approvals.filter(a => a.status === 'Rejected').length;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Approval Dashboard</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Manage and track procurement approvals</p>
+      </div>
+      <div className="grid-4" style={{ marginBottom: 24 }}>
+        <MetricCard label="PENDING APPROVALS" value={pending.length} icon="ic_time" iconColor="#F0AD00" iconBg="#FFF8E1" />
+        <MetricCard label="APPROVED THIS MONTH" value={approvedThisWeek} icon="ic_check" iconColor="#00A09D" iconBg="#E6F7F7" />
+        <MetricCard label="REJECTED THIS MONTH" value={rejectedThisWeek} icon="ic_x" iconColor="#D9534F" iconBg="#FDECEA" />
+        <MetricCard label="AVG APPROVAL TIME" value="1.2 days" icon="ic_trend" iconColor="#875A7B" iconBg="#F3EEF2" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        <div className="card">
+          <div className="card-header">
+            <span className="card-title">Pending Approvals</span>
+            {pending.length > 0 && <span className="badge badge-warning"><span className="badge-dot"></span>{pending.length} pending</span>}
+          </div>
+          {pending.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon"><Icon name="ic_check" size={40} /></div><div className="empty-state-title">No pending approvals</div><div className="empty-state-sub">All caught up! No approvals waiting for review.</div></div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead><tr><th>RFQ</th><th>Vendor</th><th>Amount</th><th>Requested</th><th>Action</th></tr></thead>
+                <tbody>
+                  {pending.map(ap => {
+                    const rfq = rfqs.find(r => r.id === ap.rfqId);
+                    return (
+                      <tr key={ap.id}>
+                        <td><span className="mono" style={{ color: 'var(--primary)' }}>{rfq?.rfqNumber}</span><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{rfq?.title}</div></td>
+                        <td>{ap.vendorName}</td>
+                        <td><span className="mono" style={{ fontWeight: 500 }}>{formatCurrency(ap.totalAmount)}</span></td>
+                        <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{timeAgo(ap.requestedAt)}</td>
+                        <td><button className="btn btn-sm btn-primary" onClick={() => setCurrentPage('approvals')}>Review</button></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="card">
+          <div className="card-header"><span className="card-title">Quick Actions</span></div>
+          <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <QuickAction icon="qa_approval" label="Review Pending" color="#1B4FD8" onClick={() => setCurrentPage('approvals')} />
+            <QuickAction icon="qa_po" label="View All POs" color="#16A34A" onClick={() => setCurrentPage('pos')} />
+            <QuickAction icon="qa_report" label="View Reports" color="#D97706" onClick={() => setCurrentPage('reports')} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VendorDashboard = () => {
+  const { currentUser, rfqs, quotations, pos, invoices, setCurrentPage, vendors } = useApp();
+  const myVendorId = currentUser?.vendorId;
+  const myRfqs = myVendorId ? rfqs.filter(r => r.vendors?.includes(myVendorId) && r.status !== 'Draft') : [];
+  const myQuotes = quotations.filter(q => q.vendorId === myVendorId);
+  const myPos = pos.filter(p => p.vendorId === myVendorId);
+  const myInvoices = invoices.filter(i => i.vendorId === myVendorId);
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Vendor Portal</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Manage your quotations and procurement activities</p>
+      </div>
+      <div className="grid-4" style={{ marginBottom: 24 }}>
+        <MetricCard label="OPEN RFQS" value={myRfqs.filter(r => r.status === 'Sent').length} icon="ic_rfq" iconColor="#875A7B" iconBg="#F3EEF2" />
+        <MetricCard label="QUOTES SUBMITTED" value={myQuotes.length} icon="ic_quotation" iconColor="#5B9BD5" iconBg="#EBF5FF" />
+        <MetricCard label="POs RECEIVED" value={myPos.length} icon="ic_po" iconColor="#00A09D" iconBg="#E6F7F7" />
+        <MetricCard label="INVOICES" value={myInvoices.length} icon="ic_invoice" iconColor="#F0AD00" iconBg="#FFF8E1" />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="card">
+          <div className="card-header"><span className="card-title">Open RFQs Assigned to Me</span></div>
+          {myRfqs.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon"><Icon name="rfqs" size={40} /></div><div className="empty-state-title">No RFQs assigned</div><div className="empty-state-sub">You have no open RFQs at the moment.</div></div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead><tr><th>RFQ</th><th>Deadline</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody>
+                  {myRfqs.map(rfq => {
+                    const days = daysUntil(rfq.deadline);
+                    const myQuote = myQuotes.find(q => q.rfqId === rfq.id);
+                    return (
+                      <tr key={rfq.id}>
+                        <td><div style={{ fontWeight: 500 }}>{rfq.rfqNumber}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{rfq.title}</div></td>
+                        <td><span className={days !== null && days < 3 ? 'deadline-urgent' : days !== null && days < 7 ? 'deadline-warning' : ''} style={{ fontSize: 13 }}>{formatDate(rfq.deadline)}{days !== null && <div style={{ fontSize: 11 }}>{days > 0 ? `${days} days left` : 'Overdue'}</div>}</span></td>
+                        <td><StatusBadge status={myQuote ? myQuote.status : 'Not Submitted'} /></td>
+                        <td>
+                          {!myQuote ? <button className="btn btn-sm btn-primary" onClick={() => setCurrentPage('vendor-rfqs')}>Submit Quote</button>
+                            : <button className="btn btn-sm btn-secondary" onClick={() => setCurrentPage('my-quotations')}>View Quote</button>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="card">
+          <div className="card-header"><span className="card-title">My Recent Quotations</span></div>
+          {myQuotes.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon"><Icon name="quotations" size={40} /></div><div className="empty-state-title">No quotations yet</div><div className="empty-state-sub">Submit your first quotation for an open RFQ.</div><button className="btn btn-primary btn-sm" onClick={() => setCurrentPage('vendor-rfqs')}>Browse RFQs</button></div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead><tr><th>RFQ</th><th>Total</th><th>Status</th><th>Submitted</th></tr></thead>
+                <tbody>
+                  {myQuotes.map(q => (
+                    <tr key={q.id}>
+                      <td><span className="mono" style={{ color: 'var(--primary)', fontSize: 12 }}>{rfqs.find(r => r.id === q.rfqId)?.rfqNumber}</span></td>
+                      <td><span className="mono" style={{ fontWeight: 500 }}>{formatCurrency(q.grandTotal)}</span></td>
+                      <td><StatusBadge status={q.status} /></td>
+                      <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{timeAgo(q.submittedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Dashboard = () => {
+  const { currentUser } = useApp();
+  if (currentUser?.role === ROLES.ADMIN) return <AdminDashboard />;
+  if (currentUser?.role === ROLES.OFFICER) return <OfficerDashboard />;
+  if (currentUser?.role === ROLES.MANAGER) return <ManagerDashboard />;
+  if (currentUser?.role === ROLES.VENDOR) return <VendorDashboard />;
+  return null;
+};
+
+
+// ═══════════════════════════════════════════════════
+// VENDOR MANAGEMENT SCREEN
+// ═══════════════════════════════════════════════════
+
+const VendorManagement = () => {
+  const { vendors, setVendors, showToast, addLog, setCurrentPage } = useApp();
+  const [search, setSearch] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editVendor, setEditVendor] = useState(null);
+  const [panelVendor, setPanelVendor] = useState(null);
+  const [panelTab, setPanelTab] = useState('details');
+  const [loading, setLoading] = useState(true);
+  const [confirmToggle, setConfirmToggle] = useState(null);
+  const [form, setForm] = useState({ name:'', category:'IT', gst:'', pan:'', contactPerson:'', email:'', phone:'', address:'', bankAccount:'', ifsc:'', status:'Active' });
+  const [formErrors, setFormErrors] = useState({});
+
+  useEffect(() => { setTimeout(() => setLoading(false), 600); }, []);
+
+  const filtered = useMemo(() => vendors.filter(v => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || v.name.toLowerCase().includes(q) || v.contactPerson?.toLowerCase().includes(q) || v.email?.toLowerCase().includes(q) || v.gst?.toLowerCase().includes(q);
+    const matchCat = !filterCategory || v.category === filterCategory;
+    const matchStatus = !filterStatus || v.status === filterStatus;
+    return matchSearch && matchCat && matchStatus;
+  }), [vendors, search, filterCategory, filterStatus]);
+
+  const openAdd = () => {
+    setEditVendor(null);
+    setForm({ name:'', category:'IT', gst:'', pan:'', contactPerson:'', email:'', phone:'', address:'', bankAccount:'', ifsc:'', status:'Active' });
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  const openEdit = (v) => {
+    setEditVendor(v);
+    setForm({ name: v.name, category: v.category, gst: v.gst, pan: v.pan||'', contactPerson: v.contactPerson||'', email: v.email||'', phone: v.phone||'', address: v.address||'', bankAccount: v.bankAccount||'', ifsc: v.ifsc||'', status: v.status });
+    setFormErrors({});
+    setModalOpen(true);
+  };
+
+  const validateForm = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = 'Company name is required';
+    if (!form.gst.trim()) e.gst = 'GST number is required';
+    else if (!validateGST(form.gst)) e.gst = 'Invalid GST format (e.g. 27AAPCS0472N1Z2)';
+    if (form.email && !validateEmail(form.email)) e.email = 'Invalid email address';
+    if (form.phone && !validatePhone(form.phone)) e.phone = 'Invalid phone (10 digits, starts with 6-9)';
+    setFormErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const saveVendor = () => {
+    if (!validateForm()) return;
+    if (editVendor) {
+      setVendors(prev => prev.map(v => v.id === editVendor.id ? { ...v, ...form } : v));
+      addLog('UPDATE', 'Vendor', editVendor.id, `Updated vendor "${form.name}"`);
+      showToast('Vendor updated successfully', 'success');
+    } else {
+      const newV = { id: generateId('v'), ...form, rating: 3.5, createdAt: new Date().toISOString().split('T')[0] };
+      setVendors(prev => [...prev, newV]);
+      addLog('CREATE', 'Vendor', newV.id, `Created vendor "${form.name}"`);
+      showToast('Vendor added successfully', 'success');
+    }
+    setModalOpen(false);
+  };
+
+  const toggleStatus = (vendor) => {
+    const next = vendor.status === 'Active' ? 'Inactive' : 'Active';
+    setVendors(prev => prev.map(v => v.id === vendor.id ? { ...v, status: next } : v));
+    addLog('UPDATE', 'Vendor', vendor.id, `Changed status to ${next}: "${vendor.name}"`);
+    showToast(`Vendor ${next === 'Active' ? 'activated' : 'deactivated'}`, 'success');
+    setConfirmToggle(null);
+  };
+
+  const columns = [
+    { key: 'name', label: 'Vendor Name', render: v => <div><div style={{ fontWeight: 500 }}>{v.name}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{v.gst}</div></div> },
+    { key: 'category', label: 'Category', render: v => <span className="badge badge-primary"><span className="badge-dot"></span>{v.category}</span> },
+    { key: 'contactPerson', label: 'Contact Person' },
+    { key: 'email', label: 'Email', render: v => <span style={{ color: 'var(--primary)', fontSize: 13 }}>{v.email}</span> },
+    { key: 'phone', label: 'Phone', render: v => <span className="mono" style={{ fontSize: 13 }}>{v.phone}</span> },
+    { key: 'rating', label: 'Rating', render: v => <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Stars rating={v.rating} /><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({v.rating})</span></div> },
+    { key: 'status', label: 'Status', render: v => <StatusBadge status={v.status} /> },
+    { key: 'actions', label: 'Actions', render: v => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); setPanelVendor(v); setPanelTab('details'); }}>View</button>
+        <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); openEdit(v); }}>Edit</button>
+        <button className={`btn btn-sm ${v.status === 'Active' ? 'btn-warning' : 'btn-success'}`} onClick={e => { e.stopPropagation(); setConfirmToggle(v); }}>
+          {v.status === 'Active' ? 'Deactivate' : 'Activate'}
+        </button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div><h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Vendor Management</h2><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Register and manage your supplier network</p></div>
+        <button className="btn btn-primary" onClick={openAdd}><span>+</span> Add Vendor</button>
+      </div>
+
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search vendors, GST, contact..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 160 }} value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
+              <option value="">All Categories</option>
+              {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select className="form-select" style={{ width: 140 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">All Status</option>
+              {VENDOR_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{filtered.length} vendor{filtered.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered.map(v => ({ ...v, _onClick: () => { setPanelVendor(v); setPanelTab('details'); } }))} loading={loading} emptyTitle="No vendors found" emptySub="Add your first vendor to get started." emptyAction={<button className="btn btn-primary" onClick={openAdd}>+ Add Vendor</button>} />
+      </div>
+
+      {/* Add/Edit Modal */}
+      {modalOpen && (
+        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
+            <div className="modal-header">
+              <span className="modal-title">{editVendor ? 'Edit Vendor' : 'Add New Vendor'}</span>
+              <button className="btn-icon btn-secondary" onClick={() => setModalOpen(false)}><Icon name="close" size={14} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="grid-2" style={{ gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Company Name <span className="req">*</span></label>
+                  <input className={`form-input${formErrors.name ? ' error' : ''}`} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Acme Corp Pvt Ltd" />
+                  {formErrors.name && <span className="form-error">{formErrors.name}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Category <span className="req">*</span></label>
+                  <select className="form-select" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                    {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">GST Number <span className="req">*</span></label>
+                  <input className={`form-input mono${formErrors.gst ? ' error' : ''}`} value={form.gst} onChange={e => setForm(f => ({ ...f, gst: e.target.value.toUpperCase() }))} placeholder="27AAPCS0472N1Z2" maxLength={15} />
+                  {formErrors.gst && <span className="form-error">{formErrors.gst}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">PAN Number</label>
+                  <input className="form-input mono" value={form.pan} onChange={e => setForm(f => ({ ...f, pan: e.target.value.toUpperCase() }))} placeholder="AAPCS0472N" maxLength={10} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contact Person</label>
+                  <input className="form-input" value={form.contactPerson} onChange={e => setForm(f => ({ ...f, contactPerson: e.target.value }))} placeholder="Rahul Mehta" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className={`form-input${formErrors.email ? ' error' : ''}`} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="contact@vendor.com" />
+                  {formErrors.email && <span className="form-error">{formErrors.email}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input className={`form-input mono${formErrors.phone ? ' error' : ''}`} value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" maxLength={10} />
+                  {formErrors.phone && <span className="form-error">{formErrors.phone}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Status</label>
+                  <select className="form-select" value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}>
+                    <option>Active</option><option>Inactive</option><option>Blacklisted</option>
+                  </select>
+                </div>
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Address</label>
+                  <textarea className="form-textarea" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Full address with pin code" rows={2} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Bank Account Number</label>
+                  <input className="form-input mono" value={form.bankAccount} onChange={e => setForm(f => ({ ...f, bankAccount: e.target.value }))} placeholder="50200012345678" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">IFSC Code</label>
+                  <input className="form-input mono" value={form.ifsc} onChange={e => setForm(f => ({ ...f, ifsc: e.target.value.toUpperCase() }))} placeholder="HDFC0001234" maxLength={11} />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveVendor}>{editVendor ? 'Save Changes' : 'Add Vendor'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Vendor Profile Slide Panel */}
+      {panelVendor && (
+        <>
+          <div className="slide-panel-overlay" onClick={() => setPanelVendor(null)} />
+          <div className="slide-panel">
+            <div className="slide-panel-header">
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>{panelVendor.name}</div>
+                <StatusBadge status={panelVendor.status} />
+              </div>
+              <button className="btn-icon btn-secondary" onClick={() => setPanelVendor(null)}><Icon name="close" size={14} /></button>
+            </div>
+            <div className="tabs" style={{ padding: '0 24px', borderBottom: '1px solid var(--border)' }}>
+              {['details','history','documents'].map(t => (
+                <div key={t} className={`tab${panelTab === t ? ' active' : ''}`} onClick={() => setPanelTab(t)} style={{ textTransform: 'capitalize' }}>{t}</div>
+              ))}
+            </div>
+            <div className="slide-panel-body">
+              {panelTab === 'details' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <Avatar name={panelVendor.name} size={56} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 18 }}>{panelVendor.name}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{panelVendor.category}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}><Stars rating={panelVendor.rating} /><span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{panelVendor.rating}/5</span></div>
+                    </div>
+                  </div>
+                  {[['GST Number', panelVendor.gst, true], ['PAN Number', panelVendor.pan, true], ['Contact Person', panelVendor.contactPerson, false], ['Email', panelVendor.email, false], ['Phone', panelVendor.phone, true], ['Address', panelVendor.address, false], ['Bank Account', panelVendor.bankAccount, true], ['IFSC Code', panelVendor.ifsc, true], ['Member Since', formatDate(panelVendor.createdAt), false]].map(([label, val, mono]) => (
+                    val && <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
+                      <span style={{ fontSize: 14, fontFamily: mono ? 'DM Mono, monospace' : undefined }}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {panelTab === 'history' && (
+                <div>
+                  <div style={{ fontWeight: 500, marginBottom: 12, fontSize: 14 }}>Procurement History</div>
+                  {INITIAL_RFQS.filter(r => r.vendors?.includes(panelVendor.id)).map(rfq => (
+                    <div key={rfq.id} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span className="mono" style={{ color: 'var(--primary)', fontSize: 13 }}>{rfq.rfqNumber}</span>
+                        <StatusBadge status={rfq.status} />
+                      </div>
+                      <div style={{ fontWeight: 500, fontSize: 14 }}>{rfq.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{formatDate(rfq.createdAt)}</div>
+                    </div>
+                  ))}
+                  {INITIAL_RFQS.filter(r => r.vendors?.includes(panelVendor.id)).length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 14, textAlign: 'center', padding: 32 }}>No procurement history</div>}
+                </div>
+              )}
+              {panelTab === 'documents' && (
+                <div>
+                  <div style={{ fontWeight: 500, marginBottom: 16, fontSize: 14 }}>Vendor Documents</div>
+                  {['GST Certificate', 'PAN Card', 'Company Registration', 'Bank Statement'].map(doc => (
+                    <div key={doc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 20 }}>📄</span>
+                        <div>
+                          <div style={{ fontWeight: 500, fontSize: 14 }}>{doc}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Not uploaded</div>
+                        </div>
+                      </div>
+                      <button className="btn btn-sm btn-secondary">Upload</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
+              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openEdit(panelVendor)}>Edit Vendor</button>
+              <button className="btn btn-secondary" onClick={() => setPanelVendor(null)}>Close</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog open={!!confirmToggle} title={confirmToggle?.status === 'Active' ? 'Deactivate Vendor?' : 'Activate Vendor?'} message={`Are you sure you want to ${confirmToggle?.status === 'Active' ? 'deactivate' : 'activate'} "${confirmToggle?.name}"?`} confirmLabel={confirmToggle?.status === 'Active' ? 'Deactivate' : 'Activate'} confirmClass={confirmToggle?.status === 'Active' ? 'btn-warning' : 'btn-success'} icon={confirmToggle?.status === 'Active' ? 'warning_tri' : 'activate'} onConfirm={() => toggleStatus(confirmToggle)} onCancel={() => setConfirmToggle(null)} />
+    </div>
+  );
+};
