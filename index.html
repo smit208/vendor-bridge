@@ -4927,4 +4927,551 @@ const ReportsAnalytics = () => {
   });
   const catLabels = Object.keys(catSpend).length ? Object.keys(catSpend) : ['IT','Logistics','Office Supplies','Services','Others'];
   const catValues = Object.keys(catSpend).length ? Object.values(catSpend) : [574000, 95000, 1417180, 30000, 50000];
-  const catColors = ['#875A7B','#00A09D','#F0AD00','#0EA5E9','#D9534F','#7C3AED','#D97706'];
+  const catColors = ['#875A7B','#00A09D','#F0AD00','#0EA5E9','#D9534F','#7C3AED','#D97706'];
+
+  const categorySpendData = {
+    labels: catLabels,
+    datasets: [{
+      data: catValues,
+      backgroundColor: catColors,
+      borderWidth: 2, borderColor: '#fff',
+      hoverOffset: 8,
+    }]
+  };
+
+  // Monthly spend bar (Spending tab)
+  const monthlyBarData = {
+    labels: monthlyLabels,
+    datasets: [{
+      label: 'Spend (₹)',
+      data: finalMonthly,
+      backgroundColor: finalMonthly.map((v, i) =>
+        i === finalMonthly.indexOf(Math.max(...finalMonthly)) ? '#875A7B' : 'rgba(135,90,123,0.45)'
+      ),
+      borderRadius: 6,
+    }]
+  };
+
+  // RFQ trend by month — live
+  const rfqsByMonth = [1,2,3,4,5,6].map(m =>
+    rfqs.filter(r => { const d = new Date(r.createdAt || r.deadline || '2026-01-01'); return d.getMonth() + 1 === m; }).length
+  );
+  const rfqTrendFill = [2, 3, 1, 4, 2, 1];
+  const rfqMonthly   = rfqsByMonth.map((v, i) => v || rfqTrendFill[i]);
+  const rfqTrendData = {
+    labels: monthlyLabels,
+    datasets: [{
+      label: 'RFQs Created',
+      data: rfqMonthly,
+      borderColor: '#0EA5E9',
+      backgroundColor: 'rgba(14,165,233,0.12)',
+      fill: true, tension: 0.4,
+      pointBackgroundColor: '#0EA5E9',
+      pointRadius: 5, pointHoverRadius: 8,
+      borderWidth: 2.5,
+    }]
+  };
+
+  // Budget data (static reference values)
+  const categoryBudget = [
+    ['IT',             700000,   catSpend['IT'] || 574000],
+    ['Logistics',      120000,   catSpend['Logistics'] || 95000],
+    ['Office Supplies',1600000,  catSpend['Office Supplies'] || 1417180],
+    ['Construction',   500000,   catSpend['Construction'] || 0],
+    ['Services',       50000,    catSpend['Services'] || 30000],
+  ];
+
+  // Chart options presets
+  const chartFont  = { family: 'DM Sans', size: 12 };
+  const yRupee     = { ticks: { callback: v => '₹' + (v >= 100000 ? (v/100000).toFixed(1)+'L' : (v/1000).toFixed(0)+'K'), font: chartFont } };
+  const baseOpts   = { responsive: true, animation: { duration: 900, easing: 'easeInOutQuart' }, plugins: { legend: { labels: { font: chartFont, boxWidth: 12 } } } };
+  const lineOpts   = { ...baseOpts, scales: { y: { ...yRupee, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false }, ticks: { font: chartFont } } } };
+  const barOpts    = { ...baseOpts, scales: { y: { ...yRupee, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false }, ticks: { font: chartFont } } }, plugins: { ...baseOpts.plugins, legend: { display: false } } };
+  const groupBarOpts = { ...baseOpts, scales: { y: { ticks: { precision: 0, font: chartFont }, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false }, ticks: { font: chartFont } } } };
+  const doughnutOpts = { ...baseOpts, cutout: '62%', plugins: { legend: { position: 'bottom', labels: { font: chartFont, boxWidth: 12, padding: 16 } } } };
+  const pieOpts    = { ...baseOpts, plugins: { legend: { position: 'bottom', labels: { font: chartFont, boxWidth: 12, padding: 14 } } } };
+  const rfqLineOpts = { ...baseOpts, scales: { y: { beginAtZero: true, ticks: { precision: 0, font: chartFont }, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false }, ticks: { font: chartFont } } } };
+
+  // ── Tab definitions with clean SVG icons ─────────────────────────────────
+  const tabs = [
+    { key: 'overview', label: 'Overview',
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> },
+    { key: 'vendors',  label: 'Vendor Performance',
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg> },
+    { key: 'spending', label: 'Spending Analysis',
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> },
+    { key: 'rfq',      label: 'RFQ Analytics',
+      icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+  ];
+
+  // ── KPI cards with inline SVG icons ──────────────────────────────────────
+  const KPICard = ({ label, value, sub, icon, iconBg, iconColor, change, isUp }) => (
+    <div className="metric-card" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.6px', textTransform: 'uppercase', marginBottom: 10 }}>{label}</div>
+          <div style={{ fontSize: typeof value === 'string' && value.length > 8 ? 18 : 24, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.1, fontFamily: 'DM Mono, monospace' }}>{value}</div>
+          {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+          {change !== undefined && (
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: isUp ? '#16A34A' : '#D9534F', fontWeight: 600 }}>
+              {isUp
+                ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              }
+              {Math.abs(change)}% vs last month
+            </div>
+          )}
+        </div>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: iconColor }}>
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+
+  const ICONS_KPI = {
+    rfq:     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>,
+    po:      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="11" y2="16"/></svg>,
+    invoice: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+    spend:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+    vendor:  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+    delivery:<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
+    trend:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+    time:    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+    check:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+    quote:   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  };
+
+  return (
+    <div>
+      {/* ── Page Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Reports &amp; Analytics</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Live procurement insights — data updates automatically</p>
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download PDF
+          </button>
+          <button className="btn btn-secondary" onClick={() => exportToCSV(vendors, [{label:'Name',key:'name'},{label:'Category',key:'category'},{label:'Rating',key:'rating'},{label:'Status',key:'status'}], 'vendors_report')} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8M8 17h5"/></svg>
+            Export CSV
+          </button>
+        </div>
+      </div>
+
+      {/* ── Tabs ── */}
+      <div className="tabs" style={{ marginBottom: 24 }}>
+        {tabs.map(t => (
+          <div key={t.key} className={`tab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            {t.icon} {t.label}
+          </div>
+        ))}
+      </div>
+
+      {/* ══════════════════ OVERVIEW TAB ══════════════════ */}
+      {activeTab === 'overview' && (
+        <div>
+          <div className="grid-3" style={{ marginBottom: 24 }}>
+            <KPICard label="Total RFQs"      value={rfqs.length}               icon={ICONS_KPI.rfq}      iconBg="#F3EEF2" iconColor="#875A7B" change={15}  isUp />
+            <KPICard label="Purchase Orders" value={pos.length}                icon={ICONS_KPI.po}       iconBg="#E6F7F7" iconColor="#00A09D" change={25}  isUp />
+            <KPICard label="Total Invoiced"  value={formatCurrency(totalSpend)} icon={ICONS_KPI.invoice}  iconBg="#FFF8E1" iconColor="#F0AD00" change={3}   isUp={false} />
+            <KPICard label="Avg PO Value"    value={formatCurrency(avgPOValue)} icon={ICONS_KPI.spend}    iconBg="#E0F2FE" iconColor="#0EA5E9" />
+            <KPICard label="On-Time Delivery" value="87%"                      icon={ICONS_KPI.delivery} iconBg="#DCFCE7" iconColor="#16A34A" change={5}   isUp />
+            <KPICard label="Active Vendors"  value={activeVendors}              icon={ICONS_KPI.vendor}   iconBg="#F3EEF2" iconColor="#875A7B" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+            <div className="card">
+              <div className="card-header"><span className="card-title">Monthly Procurement Trend (2026)</span></div>
+              <div className="card-body">
+                <ChartComponent type="line" data={monthlySpendData} options={lineOpts} height={240} />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><span className="card-title">RFQ Status Distribution</span></div>
+              <div className="card-body">
+                <ChartComponent type="doughnut" data={rfqStatusData} options={doughnutOpts} height={260} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ VENDOR PERFORMANCE TAB ══════════════════ */}
+      {activeTab === 'vendors' && (
+        <div>
+          {/* Summary KPIs */}
+          <div className="grid-4" style={{ marginBottom: 20 }}>
+            <KPICard label="Total Vendors"    value={vendors.length}     icon={ICONS_KPI.vendor}  iconBg="#F3EEF2" iconColor="#875A7B" />
+            <KPICard label="Active Vendors"   value={activeVendors}      icon={ICONS_KPI.check}   iconBg="#E6F7F7" iconColor="#00A09D" />
+            <KPICard label="Avg Rating"       value={vendors.length ? (vendors.reduce((s,v)=>s+(v.rating||0),0)/vendors.length).toFixed(1)+' ★' : '—'} icon={ICONS_KPI.trend} iconBg="#FFF8E1" iconColor="#F0AD00" />
+            <KPICard label="Total Quotations" value={quotations.length}   icon={ICONS_KPI.quote}   iconBg="#E0F2FE" iconColor="#0EA5E9" />
+          </div>
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header"><span className="card-title">Quotations Submitted vs Won</span><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>By vendor</span></div>
+            <div className="card-body">
+              <ChartComponent type="bar" data={vendorBarData} options={groupBarOpts} height={260} />
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><span className="card-title">Vendor Performance Summary</span></div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Vendor</th><th>Category</th><th>Quotations</th><th>Won</th>
+                    <th>Win Rate</th><th>POs Received</th><th>Rating</th><th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vendorStats.map(v => (
+                    <tr key={v.id}>
+                      <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={v.name} size={28} /><span style={{ fontWeight: 500 }}>{v.name}</span></div></td>
+                      <td><span className="badge badge-primary"><span className="badge-dot"></span>{v.category}</span></td>
+                      <td className="mono">{v.participated}</td>
+                      <td className="mono">{v.won}</td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3, minWidth: 60 }}>
+                            <div style={{ height: '100%', width: `${v.winRate}%`, background: v.winRate >= 50 ? '#00A09D' : v.winRate > 0 ? '#F0AD00' : '#DEE2E6', borderRadius: 3, transition: 'width 0.6s ease' }}></div>
+                          </div>
+                          <span className="mono" style={{ fontSize: 12, color: v.winRate >= 50 ? '#00A09D' : v.winRate > 0 ? '#D97706' : 'var(--text-muted)', fontWeight: 600, minWidth: 34 }}>{v.winRate}%</span>
+                        </div>
+                      </td>
+                      <td className="mono">{v.poCount}</td>
+                      <td><Stars rating={v.rating} /><span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>({v.rating})</span></td>
+                      <td><StatusBadge status={v.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ SPENDING ANALYSIS TAB ══════════════════ */}
+      {activeTab === 'spending' && (
+        <div>
+          <div className="grid-4" style={{ marginBottom: 20 }}>
+            <KPICard label="Total Invoiced"   value={formatCurrency(totalSpend)} icon={ICONS_KPI.invoice} iconBg="#FFF8E1" iconColor="#F0AD00" change={3}  isUp={false} />
+            <KPICard label="Paid Amount"      value={formatCurrency(paidSpend)}  icon={ICONS_KPI.check}   iconBg="#E6F7F7" iconColor="#00A09D" />
+            <KPICard label="Avg PO Value"     value={formatCurrency(avgPOValue)} icon={ICONS_KPI.spend}   iconBg="#E0F2FE" iconColor="#0EA5E9" />
+            <KPICard label="Total POs"        value={pos.length}                 icon={ICONS_KPI.po}      iconBg="#F3EEF2" iconColor="#875A7B" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+            <div className="card">
+              <div className="card-header"><span className="card-title">Monthly Spend (2026)</span><span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Jan – Jun</span></div>
+              <div className="card-body">
+                <ChartComponent type="bar" data={monthlyBarData} options={barOpts} height={260} />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><span className="card-title">Category-wise Spend</span></div>
+              <div className="card-body">
+                <ChartComponent type="pie" data={categorySpendData} options={pieOpts} height={280} />
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><span className="card-title">Category Budget vs Actual</span></div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th style={{ textAlign: 'right' }}>Budget</th>
+                    <th style={{ textAlign: 'right' }}>Actual</th>
+                    <th style={{ textAlign: 'right' }}>Variance</th>
+                    <th>Utilisation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categoryBudget.map(([cat, budget, actual]) => {
+                    const variance = actual - budget;
+                    const pct      = budget ? Math.round((actual / budget) * 100) : 0;
+                    const over     = pct > 100;
+                    return (
+                      <tr key={cat}>
+                        <td style={{ fontWeight: 500 }}>{cat}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(budget)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(actual)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace', color: variance >= 0 ? '#D9534F' : '#16A34A', fontWeight: 600 }}>
+                          {variance >= 0 ? '+' : ''}{formatCurrency(variance)}
+                        </td>
+                        <td style={{ minWidth: 160 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ flex: 1, height: 7, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: over ? '#D9534F' : pct > 75 ? '#F0AD00' : '#00A09D', borderRadius: 4, transition: 'width 0.6s ease' }}></div>
+                            </div>
+                            <span className="mono" style={{ fontSize: 12, color: over ? '#D9534F' : 'var(--text-secondary)', fontWeight: 600, minWidth: 38 }}>{pct}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ RFQ ANALYTICS TAB ══════════════════ */}
+      {activeTab === 'rfq' && (
+        <div>
+          <div className="grid-3" style={{ marginBottom: 24 }}>
+            <KPICard label="Avg Time to PO"      value="15 days"  icon={ICONS_KPI.time}  iconBg="#F3EEF2" iconColor="#875A7B" sub="From RFQ creation" />
+            <KPICard label="RFQ Completion Rate" value="75%"      icon={ICONS_KPI.check} iconBg="#E6F7F7" iconColor="#00A09D" change={8} isUp />
+            <KPICard label="Avg Quotes / RFQ"    value={rfqs.length ? (quotations.length / rfqs.length).toFixed(1) : '—'} icon={ICONS_KPI.quote} iconBg="#E0F2FE" iconColor="#0EA5E9" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+            <div className="card">
+              <div className="card-header"><span className="card-title">RFQs Created by Month</span></div>
+              <div className="card-body">
+                <ChartComponent type="line" data={rfqTrendData} options={rfqLineOpts} height={260} />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header"><span className="card-title">RFQ Status Breakdown</span></div>
+              <div className="card-body" style={{ paddingTop: 8 }}>
+                {Object.entries(rfqStatusCounts).map(([status, count]) => {
+                  const pct   = rfqs.length ? Math.round((count / rfqs.length) * 100) : 0;
+                  const color = rfqStatusColors[Object.keys(rfqStatusCounts).indexOf(status)] || '#94A3B8';
+                  return (
+                    <div key={status} style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ width: 9, height: 9, borderRadius: '50%', background: color, flexShrink: 0 }}></div>
+                          <span style={{ fontSize: 13 }}>{status}</span>
+                        </div>
+                        <span className="mono" style={{ fontSize: 12, color: 'var(--text-muted)' }}>{count} ({pct}%)</span>
+                      </div>
+                      <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.7s ease' }}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {rfqs.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', paddingTop: 20 }}>No RFQs yet</div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// USER MANAGEMENT
+// ═══════════════════════════════════════════════════
+
+const UserManagement = () => {
+  const { users, setUsers, showToast, addLog, resetToSeed } = useApp();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [form, setForm] = useState({ name: '', email: '', role: ROLES.OFFICER, phone: '', department: '', password: '' });
+  const [formErrors, setFormErrors] = useState({});
+
+  const saveUser = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = 'Name is required';
+    if (!form.email) e.email = 'Email is required';
+    else if (!validateEmail(form.email)) e.email = 'Invalid email';
+    if (!editUser && !form.password) e.password = 'Password is required';
+    setFormErrors(e);
+    if (Object.keys(e).length) return;
+
+    if (editUser) {
+      setUsers(prev => prev.map(u => u.id === editUser.id ? { ...u, ...form } : u));
+      addLog('UPDATE', 'User', editUser.id, `Updated user "${form.name}"`);
+      showToast('User updated', 'success');
+    } else {
+      if (users.find(u => u.email === form.email)) { setFormErrors({ email: 'Email already exists' }); return; }
+      const newUser = { id: generateId('u'), ...form, createdAt: new Date().toISOString().split('T')[0] };
+      setUsers(prev => [...prev, newUser]);
+      addLog('CREATE', 'User', newUser.id, `Created user "${form.name}" as ${form.role}`);
+      showToast('User created', 'success');
+    }
+    setModalOpen(false);
+  };
+
+  const roleColors = { [ROLES.ADMIN]: '#DC2626', [ROLES.OFFICER]: '#1B4FD8', [ROLES.VENDOR]: '#16A34A', [ROLES.MANAGER]: '#D97706' };
+
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>User Management</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Manage system users and roles</p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-primary" onClick={() => { setEditUser(null); setForm({ name: '', email: '', role: ROLES.OFFICER, phone: '', department: '', password: '' }); setFormErrors({}); setModalOpen(true); }}>+ Add User</button>
+            <button onClick={resetToSeed} style={{ display:'flex', alignItems:'center', gap:6, height:34, padding:'0 14px', borderRadius:4, fontSize:13, fontWeight:500, cursor:'pointer', background:'white', color:'var(--danger)', border:'1px solid var(--danger)', fontFamily:'DM Sans,sans-serif', transition:'all 140ms' }} onMouseEnter={e=>{e.currentTarget.style.background='#FEF2F2'}} onMouseLeave={e=>{e.currentTarget.style.background='white'}}>
+              <Icon name="trash" size={13} /> Reset Demo Data
+            </button>
+          </div>
+          <p style={{ fontSize: 11.5, color: 'var(--text-muted)', textAlign: 'right' }}>⚠ Clears all data and restores original demo data.</p>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead><tr><th>User</th><th>Email</th><th>Role</th><th>Department</th><th>Phone</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id}>
+                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Avatar name={u.name} size={32} /><span style={{ fontWeight: 500 }}>{u.name}</span></div></td>
+                  <td style={{ color: 'var(--primary)', fontSize: 13 }}>{u.email}</td>
+                  <td><span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600, background: (roleColors[u.role] || '#94A3B8') + '18', color: roleColors[u.role] || '#94A3B8' }}>{u.role}</span></td>
+                  <td style={{ color: 'var(--text-secondary)' }}>{u.department || '—'}</td>
+                  <td className="mono" style={{ fontSize: 13 }}>{u.phone || '—'}</td>
+                  <td style={{ fontSize: 13, color: 'var(--text-muted)' }}>{formatDate(u.createdAt)}</td>
+                  <td><button className="btn btn-sm btn-secondary" onClick={() => { setEditUser(u); setForm({ name: u.name, email: u.email, role: u.role, phone: u.phone || '', department: u.department || '', password: '' }); setFormErrors({}); setModalOpen(true); }}>Edit</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modalOpen && (
+        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">{editUser ? 'Edit User' : 'Add New User'}</span>
+              <button className="btn-icon btn-secondary" onClick={() => setModalOpen(false)}><Icon name="close" size={14} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className="form-group">
+                <label className="form-label">Full Name <span className="req">*</span></label>
+                <input className={`form-input${formErrors.name ? ' error' : ''}`} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Rahul Mehta" />
+                {formErrors.name && <span className="form-error">{formErrors.name}</span>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email <span className="req">*</span></label>
+                <input className={`form-input${formErrors.email ? ' error' : ''}`} type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="user@company.com" />
+                {formErrors.email && <span className="form-error">{formErrors.email}</span>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Role <span className="req">*</span></label>
+                <select className="form-select" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))}>
+                  {Object.values(ROLES).map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="grid-2" style={{ gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input className="form-input mono" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="9876543210" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Department</label>
+                  <input className="form-input" value={form.department} onChange={e => setForm(f => ({ ...f, department: e.target.value }))} placeholder="Procurement" />
+                </div>
+              </div>
+              {!editUser && (
+                <div className="form-group">
+                  <label className="form-label">Password <span className="req">*</span></label>
+                  <input className={`form-input${formErrors.password ? ' error' : ''}`} type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} placeholder="Min. 6 characters" />
+                  {formErrors.password && <span className="form-error">{formErrors.password}</span>}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveUser}>{editUser ? 'Save Changes' : 'Create User'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+// ═══════════════════════════════════════════════════
+// MAIN APP ROUTER
+// ═══════════════════════════════════════════════════
+
+const App = () => {
+  const { currentUser, currentPage } = useApp();
+
+  if (!currentUser) return <LoginScreen />;
+
+  const role = currentUser.role;
+
+  // Role-based access control
+  const accessMap = {
+    dashboard: [ROLES.ADMIN, ROLES.OFFICER, ROLES.VENDOR, ROLES.MANAGER],
+    vendors: [ROLES.ADMIN, ROLES.OFFICER],
+    rfqs: [ROLES.ADMIN, ROLES.OFFICER, ROLES.MANAGER],
+    quotations: [ROLES.ADMIN, ROLES.OFFICER],
+    comparison: [ROLES.ADMIN, ROLES.OFFICER],
+    approvals: [ROLES.ADMIN, ROLES.MANAGER],
+    pos: [ROLES.ADMIN, ROLES.OFFICER, ROLES.MANAGER],
+    invoices: [ROLES.ADMIN, ROLES.OFFICER],
+    logs: [ROLES.ADMIN, ROLES.OFFICER, ROLES.MANAGER],
+    reports: [ROLES.ADMIN, ROLES.OFFICER, ROLES.MANAGER],
+    users: [ROLES.ADMIN],
+    'vendor-rfqs': [ROLES.VENDOR],
+    'my-quotations': [ROLES.VENDOR],
+    'vendor-pos': [ROLES.VENDOR],
+    'vendor-invoices': [ROLES.VENDOR],
+  };
+
+  const renderPage = () => {
+    const allowed = accessMap[currentPage];
+    if (allowed && !allowed.includes(role)) {
+      return (
+        <div className="empty-state" style={{ minHeight: 400 }}>
+          <div style={{ fontSize: 56, marginBottom: 16 }}>🚫</div>
+          <div className="empty-state-title">Access Denied</div>
+          <div className="empty-state-sub">You do not have permission to access this page.</div>
+        </div>
+      );
+    }
+
+    switch (currentPage) {
+      case 'dashboard': return <Dashboard />;
+      case 'vendors': return <VendorManagement />;
+      case 'rfqs': return <RFQManagement />;
+      case 'quotations': return <QuotationsList />;
+      case 'comparison': return <QuotationComparison />;
+      case 'approvals': return <ApprovalsScreen />;
+      case 'pos': return <PurchaseOrders />;
+      case 'invoices': return <InvoicesScreen />;
+      case 'logs': return <ActivityLogs />;
+      case 'reports': return <ReportsAnalytics />;
+      case 'users': return <UserManagement />;
+      case 'vendor-rfqs': return <VendorRFQList />;
+      case 'my-quotations': return <MyQuotations />;
+      case 'vendor-pos': return <PurchaseOrders vendorFilter={true} />;
+      case 'vendor-invoices': return <InvoicesScreen vendorFilter={true} />;
+      default: return <Dashboard />;
+    }
+  };
+
+  return (
+    <Layout>
+      {renderPage()}
+    </Layout>
+  );
+};
+
+const Root = () => (
+  <AppProvider>
+    <App />
+    <ToastContainer />
+  </AppProvider>
+);
+
+ReactDOM.render(<Root />, document.getElementById('root'));
+</script>
+</body>
+</html>
