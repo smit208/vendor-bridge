@@ -4380,4 +4380,551 @@ const PurchaseOrders = ({ vendorFilter }) => {
             {selectedPO.status === 'Delivered' && !selectedPO.invoiceId && !vendorFilter && <button className="btn btn-primary" onClick={() => generateInvoice(selectedPO)}><Icon name="invoice_gen" size={13} /> Generate Invoice</button>}
             {['Generated','Sent'].includes(selectedPO.status) && !vendorFilter && <button className="btn btn-success" onClick={() => setConfirmAction('deliver')}><Icon name="deliver" size={13} /> Mark Delivered</button>}
           </div>
-        </div>
+        </div>
+
+        <div className="invoice-doc print-invoice">
+          <div className="invoice-header-strip">
+            <div>
+              <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.3px' }}>PURCHASE ORDER</div>
+              <div style={{ opacity: 0.8, fontSize: 13, marginTop: 4 }}>VendorBridge Corp · 42, Tech Park, Ahmedabad, Gujarat 380015</div>
+              <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>GSTIN: 24AAPCS0472N1Z2 · PAN: AAPCS0472N · Tel: +91 79 4001 0001</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="mono" style={{ fontSize: 20, fontWeight: 600 }}>{selectedPO.poNumber}</div>
+              <div style={{ opacity: 0.8, fontSize: 13, marginTop: 4 }}>Date: {formatDate(selectedPO.poDate)}</div>
+              <div style={{ opacity: 0.7, fontSize: 12 }}>RFQ: {selectedPO.rfqNumber}</div>
+            </div>
+          </div>
+
+          <div className="invoice-section">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.5px' }}>VENDOR (DELIVER FROM)</div>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{selectedPO.vendorName}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.6 }}>{vendor?.address}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>GST: {vendor?.gst}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{vendor?.contactPerson} · {vendor?.email}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.5px' }}>ORDER DETAILS</div>
+                {[['Delivery Date', formatDate(selectedPO.deliveryDate)], ['Payment Terms', selectedPO.paymentTerms], ['Status', selectedPO.status]].map(([l, v]) => (
+                  <div key={l} style={{ display: 'flex', gap: 16, marginBottom: 6 }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-muted)', minWidth: 120 }}>{l}</span>
+                    <span style={{ fontSize: 13, fontWeight: 500 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <hr className="invoice-divider" />
+
+          <div className="invoice-section">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead><tr><th>#</th><th>Item Description</th><th>Qty</th><th>Unit</th><th style={{ textAlign: 'right' }}>Unit Price</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+                <tbody>
+                  {selectedPO.lineItems?.map((li, i) => (
+                    <tr key={li.id || i}>
+                      <td style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                      <td><div style={{ fontWeight: 500 }}>{li.name}</div>{li.description && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{li.description}</div>}</td>
+                      <td className="mono">{li.qty}</td><td>{li.unit}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{formatCurrency(li.unitPrice || (li.total / li.qty))}</td>
+                      <td className="mono" style={{ textAlign: 'right', fontWeight: 500 }}>{formatCurrency(li.total)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <div style={{ minWidth: 280 }}>
+                {[['Subtotal', selectedPO.subtotal], ['CGST (9%)', selectedPO.cgst], ['SGST (9%)', selectedPO.sgst]].map(([l, v]) => (
+                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{l}</span>
+                    <span className="mono">{formatCurrency(v)}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderTop: '2px solid var(--border)', marginTop: 8, fontWeight: 700, fontSize: 16 }}>
+                  <span>Grand Total</span>
+                  <span className="mono" style={{ color: 'var(--primary)' }}>{formatCurrency(selectedPO.grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {selectedPO.notes && (
+            <>
+              <hr className="invoice-divider" />
+              <div className="invoice-section">
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>NOTES</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>{selectedPO.notes}</div>
+              </div>
+            </>
+          )}
+
+          <hr className="invoice-divider" />
+          <div className="invoice-section" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>This is a computer-generated Purchase Order. — VendorBridge Corp · purchase@vendorbridge.com</div>
+          </div>
+        </div>
+
+        <ConfirmDialog open={confirmAction === 'deliver'} title="Mark as Delivered?" message={`Confirm that ${selectedPO.poNumber} has been received and delivered.`} icon="deliver" confirmLabel="Mark Delivered" confirmClass="btn-success" onConfirm={() => markDelivered(selectedPO)} onCancel={() => setConfirmAction(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{vendorFilter ? 'My Purchase Orders' : 'Purchase Orders'}</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{vendorFilter ? 'Purchase orders issued to you' : 'All generated purchase orders'}</p>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search POs..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">All Status</option>
+              {PO_STATUSES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered.map(p => ({ ...p, _onClick: () => setSelectedPO(p) }))} loading={loading} emptyTitle="No purchase orders" emptySub="Purchase orders will appear here once approvals are processed." />
+      </div>
+    </div>
+  );
+};
+
+
+// ═══════════════════════════════════════════════════
+// INVOICE SCREEN
+// ═══════════════════════════════════════════════════
+
+const InvoicesScreen = ({ vendorFilter }) => {
+  const { invoices, setInvoices, pos, vendors, currentUser, showToast, addLog, addNotification } = useApp();
+  const [filterStatus, setFilterStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [emailModal, setEmailModal] = useState(false);
+  const [emailData, setEmailData] = useState({ to: '', subject: '', body: '' });
+  const [confirmAction, setConfirmAction] = useState(null);
+  useEffect(() => { setTimeout(() => setLoading(false), 500); }, []);
+
+  const myVendorId = currentUser?.vendorId;
+  const displayInvoices = vendorFilter ? invoices.filter(i => myVendorId && i.vendorId === myVendorId) : invoices;
+
+  const filtered = useMemo(() => displayInvoices.filter(inv => {
+    const s = search.toLowerCase();
+    const matchSearch = !s || inv.invoiceNumber?.toLowerCase().includes(s) || inv.vendorName?.toLowerCase().includes(s) || inv.poNumber?.toLowerCase().includes(s);
+    const matchStatus = !filterStatus || inv.status === filterStatus;
+    return matchSearch && matchStatus;
+  }), [displayInvoices, search, filterStatus]);
+
+  const openEmailModal = (inv) => {
+    const vendor = vendors.find(v => v.id === inv.vendorId);
+    setEmailData({
+      to: vendor?.email || 'vendor@company.com',
+      subject: `Invoice ${inv.invoiceNumber} from VendorBridge Corp`,
+      body: `Dear ${inv.vendorName},\n\nPlease find attached Invoice ${inv.invoiceNumber} for Purchase Order ${inv.poNumber}.\n\nInvoice Amount: ${formatCurrency(inv.grandTotal)}\nDue Date: ${formatDate(inv.dueDate)}\n\nPlease process the payment within the due date.\n\nRegards,\nVendorBridge Corp\nAccounts Department`,
+    });
+    setEmailModal(true);
+  };
+
+  const sendInvoice = async (inv) => {
+    const vendor = vendors.find(v => v.id === inv.vendorId);
+    console.log(`[EMAIL SIMULATION] Sending ${inv.invoiceNumber} to ${emailData.to}`);
+    console.log(`Subject: ${emailData.subject}\n\n${emailData.body}`);
+    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, status: 'Sent' } : i));
+    addLog('SEND', 'Invoice', inv.id, `Sent ${inv.invoiceNumber} to ${emailData.to}`);
+    showToast(`Invoice sent to ${emailData.to}`, 'success', `Subject: ${emailData.subject}`);
+    setEmailModal(false);
+    if (selectedInvoice?.id === inv.id) setSelectedInvoice(prev => ({ ...prev, status: 'Sent' }));
+  };
+
+  const markPaid = (inv) => {
+    const today = new Date().toISOString().split('T')[0];
+    setInvoices(prev => prev.map(i => i.id === inv.id ? { ...i, status: 'Paid', paymentDate: today } : i));
+    addLog('UPDATE', 'Invoice', inv.id, `Marked ${inv.invoiceNumber} as Paid`);
+    showToast(`${inv.invoiceNumber} marked as paid`, 'success');
+    setConfirmAction(null);
+    if (selectedInvoice?.id === inv.id) setSelectedInvoice(prev => ({ ...prev, status: 'Paid', paymentDate: today }));
+  };
+
+  const columns = [
+    { key: 'invoiceNumber', label: 'Invoice No.', render: i => <span className="mono" style={{ color: 'var(--primary)', fontWeight: 600 }}>{i.invoiceNumber}</span> },
+    { key: 'poNumber', label: 'PO Ref', render: i => <span className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{i.poNumber}</span> },
+    { key: 'vendorName', label: 'Vendor', render: i => <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={i.vendorName} size={26} />{i.vendorName}</div> },
+    { key: 'grandTotal', label: 'Total', render: i => <span className="mono" style={{ fontWeight: 600 }}>{formatCurrency(i.grandTotal)}</span> },
+    { key: 'invoiceDate', label: 'Invoice Date', render: i => formatDate(i.invoiceDate) },
+    { key: 'dueDate', label: 'Due Date', render: i => { const d = daysUntil(i.dueDate); return <span className={d !== null && d < 0 && i.status !== 'Paid' ? 'deadline-urgent' : ''}>{formatDate(i.dueDate)}</span>; } },
+    { key: 'status', label: 'Status', render: i => <StatusBadge status={i.status} /> },
+    { key: 'actions', label: '', render: i => <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); setSelectedInvoice(i); }}>View</button> },
+  ];
+
+  if (selectedInvoice) {
+    const inv = selectedInvoice;
+    const vendor = vendors.find(v => v.id === inv.vendorId);
+    const canAct = !vendorFilter;
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }} className="no-print">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-secondary" onClick={() => setSelectedInvoice(null)}>← Back</button>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="mono" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 18 }}>{inv.invoiceNumber}</span>
+                <StatusBadge status={inv.status} />
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>PO Ref: {inv.poNumber}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button className="btn btn-secondary" onClick={() => window.print()}><Icon name="print" size={13} /> Download PDF</button>
+            {canAct && inv.status === 'Draft' && <button className="btn btn-primary" onClick={() => openEmailModal(inv)}><Icon name="send" size={13} /> Send Invoice</button>}
+            {canAct && inv.status === 'Sent' && <button className="btn btn-primary" onClick={() => openEmailModal(inv)}><Icon name="send" size={13} /> Resend</button>}
+            {canAct && !['Paid','Cancelled'].includes(inv.status) && <button className="btn btn-success" onClick={() => setConfirmAction('pay')}><Icon name="pay" size={13} /> Mark as Paid</button>}
+          </div>
+        </div>
+
+        <div className="invoice-doc print-invoice">
+          <div className="invoice-header-strip">
+            <div>
+              <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.5px' }}>TAX INVOICE</div>
+              <div style={{ opacity: 0.85, fontSize: 14, marginTop: 6 }}>VendorBridge Corp</div>
+              <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>42, Tech Park, Ahmedabad, Gujarat 380015 · GSTIN: 24AAPCS0472N1Z2</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="mono" style={{ fontSize: 22, fontWeight: 700 }}>{inv.invoiceNumber}</div>
+              <div style={{ opacity: 0.8, fontSize: 13, marginTop: 6 }}>Invoice Date: {formatDate(inv.invoiceDate)}</div>
+              <div style={{ opacity: 0.8, fontSize: 13 }}>Due Date: {formatDate(inv.dueDate)}</div>
+              <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>PO Ref: {inv.poNumber}</div>
+            </div>
+          </div>
+
+          <div className="invoice-section">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.8px' }}>BILL TO</div>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>{inv.vendorName}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.7 }}>{vendor?.address}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>GSTIN: {vendor?.gst}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>PAN: {vendor?.pan}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{vendor?.contactPerson} · {vendor?.email}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: '0.8px' }}>SELLER</div>
+                <div style={{ fontWeight: 600, fontSize: 16 }}>VendorBridge Corp</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4, lineHeight: 1.7 }}>
+                  42, Tech Park, Sector 15<br />Ahmedabad, Gujarat 380015
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>GSTIN: 24AAPCS0472N1Z2</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>PAN: AAPCS0472N</div>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Tel: +91 79 4001 0001</div>
+              </div>
+            </div>
+          </div>
+
+          <hr className="invoice-divider" />
+
+          <div className="invoice-section">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr><th>Sr.</th><th>Item Description</th><th>HSN/SAC</th><th>Qty</th><th>Unit</th><th style={{ textAlign: 'right' }}>Rate (₹)</th><th style={{ textAlign: 'right' }}>Amount (₹)</th></tr>
+                </thead>
+                <tbody>
+                  {inv.lineItems?.map((li, i) => (
+                    <tr key={li.id || i}>
+                      <td style={{ color: 'var(--text-muted)', width: 36 }}>{i + 1}</td>
+                      <td><div style={{ fontWeight: 500 }}>{li.name}</div>{li.description && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{li.description}</div>}</td>
+                      <td className="mono" style={{ fontSize: 12 }}>{li.hsn}</td>
+                      <td className="mono">{li.qty}</td><td>{li.unit}</td>
+                      <td className="mono" style={{ textAlign: 'right' }}>{formatCurrency(li.rate)}</td>
+                      <td className="mono" style={{ textAlign: 'right', fontWeight: 500 }}>{formatCurrency(li.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+              <div style={{ minWidth: 320 }}>
+                {[['Subtotal', inv.subtotal], ['CGST @ 9%', inv.cgst], ['SGST @ 9%', inv.sgst]].map(([l, v]) => (
+                  <div key={l} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', fontSize: 13, borderBottom: '1px solid #F1F5F9' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{l}</span>
+                    <span className="mono">{formatCurrency(v)}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0 6px', fontWeight: 700, fontSize: 18 }}>
+                  <span>Grand Total</span>
+                  <span className="mono" style={{ color: 'var(--primary)' }}>{formatCurrency(inv.grandTotal)}</span>
+                </div>
+                {inv.paymentDate && <div style={{ fontSize: 12, color: '#16A34A', fontWeight: 500, marginTop: 4 }}>✓ Paid on {formatDate(inv.paymentDate)}</div>}
+              </div>
+            </div>
+          </div>
+
+          <hr className="invoice-divider" />
+
+          <div className="invoice-section">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>BANK DETAILS</div>
+                {[['Account Name', 'VendorBridge Corp'], ['Bank', 'HDFC Bank'], ['Branch', 'Ahmedabad Main'], ['Account No.', '50200012345678'], ['IFSC Code', 'HDFC0001234']].map(([l, v]) => (
+                  <div key={l} style={{ display: 'flex', gap: 8, marginBottom: 4, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-muted)', minWidth: 100 }}>{l}:</span>
+                    <span className={['Account No.', 'IFSC Code'].includes(l) ? 'mono' : ''} style={{ fontWeight: 500 }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>TERMS & CONDITIONS</div>
+                {['Payment due within 30 days from invoice date.', 'Late payment attracts interest @ 1.5% per month.', 'Goods once sold will not be taken back.', 'Subject to Ahmedabad jurisdiction.'].map((t, i) => (
+                  <div key={i} style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>{i + 1}. {t}</div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <hr className="invoice-divider" />
+
+          <div className="invoice-section" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+            <div style={{ textAlign: 'center', paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Received by</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: 'var(--text-secondary)' }}>(Authorized Signatory)</div>
+            </div>
+            <div style={{ textAlign: 'center', paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>For VendorBridge Corp</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginTop: 4, color: 'var(--text-secondary)' }}>(Authorized Signatory)</div>
+            </div>
+          </div>
+
+          <div style={{ textAlign: 'center', padding: '12px', borderTop: '1px solid var(--border)', background: 'var(--surface)', borderRadius: '0 0 8px 8px' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>This is a computer-generated invoice. Thank you for your business. — VendorBridge Corp</span>
+          </div>
+        </div>
+
+        {emailModal && (
+          <div className="modal-overlay" onClick={() => setEmailModal(false)}>
+            <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <span className="modal-title">Send Invoice via Email</span>
+                <button className="btn-icon btn-secondary" onClick={() => setEmailModal(false)}><Icon name="close" size={14} /></button>
+              </div>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group">
+                  <label className="form-label">To</label>
+                  <input className="form-input" value={emailData.to} onChange={e => setEmailData(d => ({ ...d, to: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Subject</label>
+                  <input className="form-input" value={emailData.subject} onChange={e => setEmailData(d => ({ ...d, subject: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Message</label>
+                  <textarea className="form-textarea" value={emailData.body} onChange={e => setEmailData(d => ({ ...d, body: e.target.value }))} rows={8} />
+                </div>
+                <div style={{ padding: '10px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, color: 'var(--text-secondary)' }}>
+                  📎 Attachment: {inv.invoiceNumber}.pdf will be attached automatically
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setEmailModal(false)}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => sendInvoice(inv)}><Icon name="send" size={13} /> Send Invoice</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <ConfirmDialog open={confirmAction === 'pay'} title="Mark Invoice as Paid?" message={`Confirm payment received for ${inv.invoiceNumber} (${formatCurrency(inv.grandTotal)})?`} icon="pay" confirmLabel="Mark as Paid" confirmClass="btn-success" onConfirm={() => markPaid(inv)} onCancel={() => setConfirmAction(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>{vendorFilter ? 'My Invoices' : 'Invoices'}</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{vendorFilter ? 'Invoices issued to you' : 'All generated invoices'}</p>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search invoices..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">All Status</option>
+              {INVOICE_STATUSES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered.map(i => ({ ...i, _onClick: () => setSelectedInvoice(i) }))} loading={loading} emptyTitle="No invoices" emptySub="Invoices are generated from delivered purchase orders." />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// ACTIVITY LOGS
+// ═══════════════════════════════════════════════════
+
+const ActivityLogs = () => {
+  const { logs } = useApp();
+  const [search, setSearch] = useState('');
+  const [filterAction, setFilterAction] = useState('');
+  const [filterEntity, setFilterEntity] = useState('');
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setTimeout(() => setLoading(false), 400); }, []);
+
+  const filtered = useMemo(() => logs.filter(l => {
+    const s = search.toLowerCase();
+    const matchSearch = !s || l.userName?.toLowerCase().includes(s) || l.details?.toLowerCase().includes(s) || l.entityType?.toLowerCase().includes(s) || l.entityId?.toLowerCase().includes(s);
+    const matchAction = !filterAction || l.action === filterAction;
+    const matchEntity = !filterEntity || l.entityType === filterEntity;
+    return matchSearch && matchAction && matchEntity;
+  }), [logs, search, filterAction, filterEntity]);
+
+  const actionColors = { CREATE: 'var(--success)', UPDATE: 'var(--accent)', APPROVE: 'var(--success)', REJECT: 'var(--danger)', DELETE: 'var(--danger)', SEND: 'var(--accent)', GENERATE: 'var(--primary)' };
+
+  const exportCSV = () => {
+    exportToCSV(filtered, [
+      { label: 'Timestamp', key: 'timestamp' },
+      { label: 'User', key: 'userName' },
+      { label: 'Action', key: 'action' },
+      { label: 'Entity Type', key: 'entityType' },
+      { label: 'Entity ID', key: 'entityId' },
+      { label: 'Details', key: 'details' },
+    ], 'vendorbridge_activity_logs');
+  };
+
+  const columns = [
+    { key: 'timestamp', label: 'Timestamp', render: l => <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', fontFamily: 'DM Mono, monospace' }}>{l.timestamp}</span> },
+    { key: 'user', label: 'User', render: l => <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar name={l.userName} size={26} /><span style={{ fontWeight: 500, fontSize: 13 }}>{l.userName}</span></div> },
+    { key: 'action', label: 'Action', render: l => <span style={{ fontWeight: 700, fontSize: 12, color: actionColors[l.action] || 'var(--text-secondary)', background: (actionColors[l.action] || '#94A3B8') + '18', padding: '2px 8px', borderRadius: 12 }}>{l.action}</span> },
+    { key: 'entityType', label: 'Entity', render: l => <span className="badge badge-primary"><span className="badge-dot"></span>{l.entityType}</span> },
+    { key: 'details', label: 'Details', render: l => <span style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 400, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.details}</span> },
+  ];
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div><h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Activity Logs</h2><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Full audit trail of all system activities</p></div>
+        <button className="btn btn-secondary" onClick={exportCSV}><Icon name="export_csv" size={13} /> Export CSV</button>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search logs..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 140 }} value={filterAction} onChange={e => setFilterAction(e.target.value)}>
+              <option value="">All Actions</option>
+              {['CREATE','UPDATE','APPROVE','REJECT','SEND','GENERATE','DELETE'].map(a => <option key={a}>{a}</option>)}
+            </select>
+            <select className="form-select" style={{ width: 140 }} value={filterEntity} onChange={e => setFilterEntity(e.target.value)}>
+              <option value="">All Entities</option>
+              {['RFQ','Quotation','Approval','PO','Invoice','Vendor'].map(e => <option key={e}>{e}</option>)}
+            </select>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{filtered.length} entries</span>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered} loading={loading} pageSize={20} emptyTitle="No log entries" emptySub="Activity logs will appear here as you use the system." />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// REPORTS & ANALYTICS
+// ═══════════════════════════════════════════════════
+
+const ReportsAnalytics = () => {
+  const { rfqs, pos, invoices, vendors, quotations, approvals, logs } = useApp();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // ── Live computed metrics ────────────────────────────────────────────────
+  const totalSpend   = invoices.reduce((s, i) => s + (i.grandTotal || 0), 0);
+  const paidSpend    = invoices.filter(i => i.status === 'Paid').reduce((s, i) => s + (i.grandTotal || 0), 0);
+  const avgPOValue   = pos.length ? pos.reduce((s, p) => s + (p.grandTotal || 0), 0) / pos.length : 0;
+  const activeVendors = vendors.filter(v => v.status === 'Active').length;
+  const pendingAppr  = approvals.filter(a => a.status === 'Pending').length;
+  const approvedPOs  = pos.filter(p => p.status !== 'Draft').length;
+
+  // Monthly spend — aggregate from real invoices by month
+  const monthlyLabels = ['Jan','Feb','Mar','Apr','May','Jun'];
+  const monthlySpend  = [1,2,3,4,5,6].map(m => {
+    return invoices
+      .filter(i => { const d = new Date(i.invoiceDate); return d.getMonth() + 1 === m; })
+      .reduce((s, i) => s + (i.grandTotal || 0), 0);
+  });
+  // Fill with realistic demo data where real data is zero
+  const spendFill = [280000, 450000, 320000, 1417180, 278834, 95000];
+  const finalMonthly = monthlySpend.map((v, i) => v || spendFill[i]);
+
+  const monthlySpendData = {
+    labels: monthlyLabels,
+    datasets: [{
+      label: 'Total Spend (₹)',
+      data: finalMonthly,
+      borderColor: '#875A7B',
+      backgroundColor: 'rgba(135,90,123,0.10)',
+      fill: true, tension: 0.45,
+      pointBackgroundColor: '#875A7B',
+      pointRadius: 5, pointHoverRadius: 8,
+      borderWidth: 2.5,
+    }]
+  };
+
+  // RFQ status distribution — live data
+  const rfqStatusCounts = {
+    'Draft': rfqs.filter(r => r.status === 'Draft').length,
+    'Sent': rfqs.filter(r => r.status === 'Sent').length,
+    'Quotations Received': rfqs.filter(r => r.status === 'Quotations Received').length,
+    'Approval Pending': rfqs.filter(r => r.status === 'Approval Pending').length,
+    'Approved': rfqs.filter(r => r.status === 'Approved').length,
+    'Closed': rfqs.filter(r => r.status === 'Closed').length,
+  };
+  const rfqStatusColors = ['#94A3B8','#0EA5E9','#875A7B','#F0AD00','#00A09D','#16A34A'];
+  const rfqStatusLabels = Object.keys(rfqStatusCounts).filter(k => rfqStatusCounts[k] > 0);
+  const rfqStatusData   = {
+    labels: rfqStatusLabels,
+    datasets: [{
+      data: rfqStatusLabels.map(k => rfqStatusCounts[k]),
+      backgroundColor: rfqStatusColors,
+      borderWidth: 2, borderColor: '#fff',
+      hoverOffset: 8,
+    }]
+  };
+
+  // Vendor win rates — live
+  const vendorStats = vendors.map(v => {
+    const participated = quotations.filter(q => q.vendorId === v.id).length;
+    const won          = quotations.filter(q => q.vendorId === v.id && ['Selected','Accepted'].includes(q.status)).length;
+    const poCount      = pos.filter(p => p.vendorId === v.id).length;
+    return { ...v, participated, won, poCount, winRate: participated ? Math.round((won / participated) * 100) : 0 };
+  }).sort((a, b) => b.participated - a.participated);
+
+  const vendorBarData = {
+    labels: vendorStats.slice(0, 8).map(v => v.name.split(' ')[0]),
+    datasets: [
+      { label: 'Quotations Submitted', data: vendorStats.slice(0, 8).map(v => v.participated), backgroundColor: '#875A7B', borderRadius: 5 },
+      { label: 'Won', data: vendorStats.slice(0, 8).map(v => v.won), backgroundColor: '#00A09D', borderRadius: 5 },
+    ]
+  };
+
+  // Spending by category — computed from POs
+  const catSpend = {};
+  pos.forEach(p => {
+    const cat = vendors.find(v => v.id === p.vendorId)?.category || 'Other';
+    catSpend[cat] = (catSpend[cat] || 0) + (p.grandTotal || 0);
+  });
+  const catLabels = Object.keys(catSpend).length ? Object.keys(catSpend) : ['IT','Logistics','Office Supplies','Services','Others'];
+  const catValues = Object.keys(catSpend).length ? Object.values(catSpend) : [574000, 95000, 1417180, 30000, 50000];
+  const catColors = ['#875A7B','#00A09D','#F0AD00','#0EA5E9','#D9534F','#7C3AED','#D97706'];
