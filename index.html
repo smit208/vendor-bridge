@@ -2736,4 +2736,990 @@ const VendorManagement = () => {
       <ConfirmDialog open={!!confirmToggle} title={confirmToggle?.status === 'Active' ? 'Deactivate Vendor?' : 'Activate Vendor?'} message={`Are you sure you want to ${confirmToggle?.status === 'Active' ? 'deactivate' : 'activate'} "${confirmToggle?.name}"?`} confirmLabel={confirmToggle?.status === 'Active' ? 'Deactivate' : 'Activate'} confirmClass={confirmToggle?.status === 'Active' ? 'btn-warning' : 'btn-success'} icon={confirmToggle?.status === 'Active' ? 'warning_tri' : 'activate'} onConfirm={() => toggleStatus(confirmToggle)} onCancel={() => setConfirmToggle(null)} />
     </div>
   );
-};
+};
+
+// ═══════════════════════════════════════════════════
+// RFQ MANAGEMENT
+// ═══════════════════════════════════════════════════
+
+const RFQManagement = () => {
+  const { rfqs, setRfqs, vendors, quotations, currentUser, showToast, addLog, addNotification, setCurrentPage } = useApp();
+  const [view, setView] = useState('list'); // list | create | detail
+  const [selectedRfq, setSelectedRfq] = useState(null);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [step, setStep] = useState(1);
+  const [rfqTab, setRfqTab] = useState('quotations');
+  const [confirmSend, setConfirmSend] = useState(false);
+  const [editRfqId, setEditRfqId] = useState(null);
+
+  const [form, setForm] = useState({
+    title: '', description: '', category: 'IT', deadline: '', priority: 'Medium',
+    lineItems: [{ id: generateId('li'), name: '', description: '', qty: 1, unit: 'Nos', estimatedPrice: 0 }],
+    vendors: [],
+  });
+  const [formErrors, setFormErrors] = useState({});
+
+  useEffect(() => { setTimeout(() => setLoading(false), 500); }, []);
+
+  const canCreate = [ROLES.ADMIN, ROLES.OFFICER].includes(currentUser?.role);
+  const vendorSearch = useState('')[0];
+
+  const filtered = useMemo(() => rfqs.filter(r => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || r.title.toLowerCase().includes(q) || r.rfqNumber.toLowerCase().includes(q);
+    const matchStatus = !filterStatus || r.status === filterStatus;
+    return matchSearch && matchStatus;
+  }), [rfqs, search, filterStatus]);
+
+  const totalEstimate = form.lineItems.reduce((s, i) => s + (Number(i.qty) * Number(i.estimatedPrice)), 0);
+
+  const addLineItem = () => setForm(f => ({ ...f, lineItems: [...f.lineItems, { id: generateId('li'), name: '', description: '', qty: 1, unit: 'Nos', estimatedPrice: 0 }] }));
+  const removeLineItem = (id) => setForm(f => ({ ...f, lineItems: f.lineItems.filter(li => li.id !== id) }));
+  const updateLineItem = (id, field, value) => setForm(f => ({ ...f, lineItems: f.lineItems.map(li => li.id === id ? { ...li, [field]: value } : li) }));
+
+  const validateStep = (s) => {
+    const e = {};
+    if (s === 1) {
+      if (!form.title.trim()) e.title = 'RFQ title is required';
+      if (!form.deadline) e.deadline = 'Deadline is required';
+      else if (new Date(form.deadline) <= new Date('2026-06-06')) e.deadline = 'Deadline must be a future date';
+    }
+    if (s === 2) {
+      if (form.lineItems.some(li => !li.name.trim())) e.lineItems = 'All items must have a name';
+    }
+    if (s === 3) {
+      if (form.vendors.length === 0) e.vendors = 'Select at least one vendor';
+    }
+    setFormErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const saveRfq = (status) => {
+    if (editRfqId) {
+      // UPDATE existing RFQ
+      const updated = { ...rfqs.find(r => r.id === editRfqId), ...form, status };
+      setRfqs(prev => prev.map(r => r.id === editRfqId ? updated : r));
+      addLog('UPDATE', 'RFQ', editRfqId, `Updated RFQ "${form.title}" — status: ${status}`);
+      if (status === 'Sent') {
+        addLog('SEND', 'RFQ', editRfqId, `Sent RFQ to ${form.vendors.length} vendors`);
+        form.vendors.forEach(vId => {
+          addNotification('rfq', `RFQ updated & sent: ${form.title} — submit your quotation`, vId);
+        });
+        showToast(`RFQ updated and sent to ${form.vendors.length} vendor(s)`, 'success');
+      } else {
+        showToast('RFQ updated and saved as draft', 'success');
+      }
+      // Go back to detail view
+      setSelectedRfq({ ...updated });
+      setView('detail');
+      setRfqTab('quotations');
+    } else {
+      // CREATE new RFQ
+      const count = rfqs.length + 1;
+      const newRfq = {
+        id: generateId('rfq'),
+        rfqNumber: generateRFQNumber(count),
+        ...form, status,
+        createdBy: currentUser.id,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      setRfqs(prev => [newRfq, ...prev]);
+      addLog('CREATE', 'RFQ', newRfq.id, `Created RFQ "${newRfq.title}" with status: ${status}`);
+      if (status === 'Sent') {
+        addLog('SEND', 'RFQ', newRfq.id, `Sent RFQ to ${form.vendors.length} vendors`);
+        form.vendors.forEach(vId => {
+          const v = vendors.find(vn => vn.id === vId);
+          addNotification('rfq', `You have been invited to submit quotation for ${newRfq.rfqNumber}: ${newRfq.title}`, vId);
+        });
+        showToast(`RFQ ${newRfq.rfqNumber} sent to ${form.vendors.length} vendor(s)`, 'success');
+      } else {
+        showToast('RFQ saved as draft', 'success');
+      }
+      setView('list');
+    }
+    setStep(1);
+    setEditRfqId(null);
+    setForm({ title: '', description: '', category: 'IT', deadline: '', priority: 'Medium', lineItems: [{ id: generateId('li'), name: '', description: '', qty: 1, unit: 'Nos', estimatedPrice: 0 }], vendors: [] });
+  };
+
+
+  const priorityColors = { High: '#DC2626', Medium: '#D97706', Low: '#16A34A' };
+
+  const columns = [
+    { key: 'rfqNumber', label: 'RFQ Number', render: r => <span className="mono" style={{ color: 'var(--primary)', fontWeight: 500 }}>{r.rfqNumber}</span> },
+    { key: 'title', label: 'Title', render: r => <div><div style={{ fontWeight: 500 }}>{r.title}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.category}</div></div> },
+    { key: 'priority', label: 'Priority', render: r => <span style={{ color: priorityColors[r.priority], fontWeight: 600, fontSize: 13 }}>● {r.priority}</span> },
+    { key: 'deadline', label: 'Deadline', render: r => { const d = daysUntil(r.deadline); return <div><div>{formatDate(r.deadline)}</div>{d !== null && r.status !== 'Closed' && <div className={d < 0 ? 'deadline-urgent' : d < 3 ? 'deadline-urgent' : d < 7 ? 'deadline-warning' : ''} style={{ fontSize: 12 }}>{d < 0 ? 'Overdue' : `${d}d left`}</div>}</div>; } },
+    { key: 'vendors', label: 'Vendors', render: r => <span>{r.vendors?.length || 0}</span> },
+    { key: 'quotations', label: 'Quotations', render: r => { const qCount = quotations.filter(q => q.rfqId === r.id).length; return <span>{qCount}/{r.vendors?.length || 0}</span>; } },
+    { key: 'status', label: 'Status', render: r => <StatusBadge status={r.status} /> },
+    { key: 'actions', label: '', render: r => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); setSelectedRfq(r); setView('detail'); setRfqTab('quotations'); }}>View</button>
+        {canCreate && r.status === 'Draft' && (
+          <button className="btn btn-sm btn-primary" onClick={e => { e.stopPropagation(); openEditRfq(r); }}>Edit</button>
+        )}
+      </div>
+    )},
+  ];
+
+  const [confirmSendExisting, setConfirmSendExisting] = useState(false);
+
+
+  const sendExistingRfq = (rfq) => {
+    if (!rfq.vendors || rfq.vendors.length === 0) {
+      showToast('Add at least one vendor before sending', 'error'); return;
+    }
+    setRfqs(prev => prev.map(r => r.id === rfq.id ? { ...r, status: 'Sent' } : r));
+    setSelectedRfq(prev => ({ ...prev, status: 'Sent' }));
+    addLog('SEND', 'RFQ', rfq.id, `Sent RFQ ${rfq.rfqNumber} to ${rfq.vendors.length} vendors`);
+    rfq.vendors.forEach(vId => {
+      addNotification('rfq', `New RFQ ${rfq.rfqNumber}: ${rfq.title} — submit your quotation`, vId);
+    });
+    showToast(`RFQ ${rfq.rfqNumber} sent to ${rfq.vendors.length} vendor(s)`, 'success');
+    setConfirmSendExisting(false);
+  };
+
+  const closeRfq = (rfq) => {
+    setRfqs(prev => prev.map(r => r.id === rfq.id ? { ...r, status: 'Closed' } : r));
+    setSelectedRfq(prev => ({ ...prev, status: 'Closed' }));
+    addLog('UPDATE', 'RFQ', rfq.id, `Closed RFQ ${rfq.rfqNumber}`);
+    showToast(`RFQ ${rfq.rfqNumber} closed`, 'info');
+  };
+
+  const openEditRfq = (rfq) => {
+    setForm({
+      title: rfq.title, description: rfq.description || '', category: rfq.category,
+      deadline: rfq.deadline, priority: rfq.priority,
+      lineItems: rfq.lineItems || [{ id: generateId('li'), name: '', description: '', qty: 1, unit: 'Nos', estimatedPrice: 0 }],
+      vendors: rfq.vendors || [],
+    });
+    setEditRfqId(rfq.id);
+    setStep(1);
+    setView('create');
+  };
+
+
+  if (view === 'create') {
+    const activeVendors = vendors.filter(v => v.status === 'Active');
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+          <button className="btn btn-secondary" onClick={() => { setView(editRfqId ? 'detail' : 'list'); setStep(1); setEditRfqId(null); }}>← {editRfqId ? 'Back to RFQ' : 'Back'}</button>
+          <div><h2 style={{ fontSize: 20, fontWeight: 600 }}>{editRfqId ? 'Edit RFQ' : 'Create New RFQ'}</h2><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{editRfqId ? 'Update the RFQ details below' : 'Fill in the details to initiate a procurement request'}</p></div>
+        </div>
+
+        {/* Step indicator */}
+        <div className="steps" style={{ marginBottom: 32 }}>
+          {[['RFQ Details', 1], ['Line Items', 2], ['Select Vendors', 3], ['Review & Send', 4]].map(([label, s], i, arr) => (
+            <React.Fragment key={s}>
+              <div className="step" style={{ flexDirection: 'column', alignItems: 'center', flex: 'none' }}>
+                <div className={`step-circle ${step > s ? 'done' : step === s ? 'active' : 'pending'}`}>{step > s ? '✓' : s}</div>
+                <div className="step-label" style={{ color: step === s ? 'var(--primary)' : 'var(--text-muted)', textAlign: 'center', marginTop: 6 }}>{label}</div>
+              </div>
+              {i < arr.length - 1 && <div className={`step-connector${step > s ? ' done' : ''}`} style={{ marginTop: -16 }}></div>}
+            </React.Fragment>
+          ))}
+        </div>
+
+        <div className="card card-body">
+          {step === 1 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div className="grid-2">
+                <div className="form-group">
+                  <label className="form-label">RFQ Title <span className="req">*</span></label>
+                  <input className={`form-input${formErrors.title ? ' error' : ''}`} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Office Furniture Procurement Q3 2026" />
+                  {formErrors.title && <span className="form-error">{formErrors.title}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Category <span className="req">*</span></label>
+                  <select className="form-select" value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+                    {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Deadline <span className="req">*</span></label>
+                  <input className={`form-input${formErrors.deadline ? ' error' : ''}`} type="date" value={form.deadline} onChange={e => setForm(f => ({ ...f, deadline: e.target.value }))} min="2026-06-07" />
+                  {formErrors.deadline && <span className="form-error">{formErrors.deadline}</span>}
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Priority</label>
+                  <select className="form-select" value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+                    <option>High</option><option>Medium</option><option>Low</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Description / Scope of Work</label>
+                <textarea className="form-textarea" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the procurement requirement in detail — specifications, standards, delivery requirements, etc." rows={4} />
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <div><div style={{ fontWeight: 600, fontSize: 15 }}>Line Items</div><div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Add all products or services required</div></div>
+                <button className="btn btn-secondary" onClick={addLineItem}><span>+</span> Add Item</button>
+              </div>
+              {formErrors.lineItems && <div style={{ marginBottom: 12, padding: '8px 12px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 6, color: '#991B1B', fontSize: 13 }}>{formErrors.lineItems}</div>}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface)' }}>
+                      {['Item Name *', 'Description', 'Qty *', 'Unit', 'Est. Price (₹)', ''].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{h}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {form.lineItems.map((li, i) => (
+                      <tr key={li.id}>
+                        <td style={{ padding: '8px 6px' }}><input className="form-input" value={li.name} onChange={e => updateLineItem(li.id, 'name', e.target.value)} placeholder="Item name" style={{ minWidth: 160 }} /></td>
+                        <td style={{ padding: '8px 6px' }}><input className="form-input" value={li.description} onChange={e => updateLineItem(li.id, 'description', e.target.value)} placeholder="Optional" style={{ minWidth: 160 }} /></td>
+                        <td style={{ padding: '8px 6px' }}><input className="form-input mono" type="number" min="1" value={li.qty} onChange={e => updateLineItem(li.id, 'qty', e.target.value)} style={{ width: 80 }} /></td>
+                        <td style={{ padding: '8px 6px' }}>
+                          <select className="form-select" value={li.unit} onChange={e => updateLineItem(li.id, 'unit', e.target.value)} style={{ width: 90 }}>
+                            {['Nos','Pcs','Kg','Litre','Meter','Pack','Set','Year','Month'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td style={{ padding: '8px 6px' }}><input className="form-input mono" type="number" min="0" value={li.estimatedPrice} onChange={e => updateLineItem(li.id, 'estimatedPrice', e.target.value)} style={{ width: 120 }} /></td>
+                        <td style={{ padding: '8px 6px' }}>{form.lineItems.length > 1 && <button className="btn btn-sm btn-danger" onClick={() => removeLineItem(li.id)}><Icon name="close" size={14} /></button>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4} style={{ padding: '10px 6px', textAlign: 'right', fontWeight: 600, fontSize: 14 }}>Total Estimated Value:</td>
+                      <td style={{ padding: '10px 6px', fontFamily: 'DM Mono, monospace', fontWeight: 600, color: 'var(--primary)', fontSize: 15 }}>{formatCurrency(totalEstimate)}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Select Vendors</div>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Choose vendors to invite for this RFQ. Only active vendors are shown.</div>
+              </div>
+              {formErrors.vendors && <div style={{ marginBottom: 12, padding: '8px 12px', background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: 6, color: '#991B1B', fontSize: 13 }}>{formErrors.vendors}</div>}
+              <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}><strong>{form.vendors.length}</strong> vendor{form.vendors.length !== 1 ? 's' : ''} selected</span>
+                <select className="form-select" style={{ width: 160 }} onChange={e => {
+                  const cat = e.target.value;
+                  if (!cat) return;
+                  const relevant = activeVendors.filter(v => v.category === cat).map(v => v.id);
+                  setForm(f => ({ ...f, vendors: [...new Set([...f.vendors, ...relevant])] }));
+                }}>
+                  <option value="">Filter by category</option>
+                  {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>Auto-select {c}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {activeVendors.map(v => (
+                  <div key={v.id} className={`checkbox-item${form.vendors.includes(v.id) ? ' checked' : ''}`} onClick={() => setForm(f => ({ ...f, vendors: f.vendors.includes(v.id) ? f.vendors.filter(id => id !== v.id) : [...f.vendors, v.id] }))}>
+                    <input type="checkbox" checked={form.vendors.includes(v.id)} onChange={() => {}} style={{ accentColor: 'var(--primary)' }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 500, fontSize: 14 }}>{v.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{v.category} · <Stars rating={v.rating} /></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>Review RFQ Details</div>
+                <div className="card" style={{ padding: 16, marginBottom: 16 }}>
+                  <div className="grid-2" style={{ gap: 12 }}>
+                    {[['Title', form.title], ['Category', form.category], ['Deadline', formatDate(form.deadline)], ['Priority', form.priority]].map(([l, v]) => (
+                      <div key={l}><div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>{v}</div></div>
+                    ))}
+                  </div>
+                  {form.description && <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}><div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>Description</div><div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{form.description}</div></div>}
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Line Items ({form.lineItems.length})</div>
+                <table className="data-table" style={{ marginBottom: 16 }}>
+                  <thead><tr><th>Item</th><th>Qty</th><th>Unit</th><th style={{ textAlign: 'right' }}>Est. Price</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+                  <tbody>
+                    {form.lineItems.map(li => (
+                      <tr key={li.id}>
+                        <td>{li.name}<div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{li.description}</div></td>
+                        <td>{li.qty}</td><td>{li.unit}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(li.estimatedPrice)}</td>
+                        <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}>{formatCurrency(li.qty * li.estimatedPrice)}</td>
+                      </tr>
+                    ))}
+                    <tr><td colSpan={3}></td><td style={{ textAlign: 'right', fontWeight: 600 }}>Total</td><td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 600, color: 'var(--primary)' }}>{formatCurrency(totalEstimate)}</td></tr>
+                  </tbody>
+                </table>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 10 }}>Selected Vendors ({form.vendors.length})</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {form.vendors.map(vId => { const v = vendors.find(vn => vn.id === vId); return v ? <span key={vId} style={{ padding: '4px 12px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 20, fontSize: 13, fontWeight: 500 }}>{v.name}</span> : null; })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--border)' }}>
+            <button className="btn btn-secondary" onClick={() => step > 1 ? setStep(s => s - 1) : (editRfqId ? (setView('detail'), setStep(1), setEditRfqId(null)) : setView('list'))}>
+              {step > 1 ? '← Previous' : (editRfqId ? '✕ Cancel Edit' : '✕ Cancel')}
+            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {step === 4 && <button className="btn btn-secondary" onClick={() => saveRfq('Draft')}>Save as Draft</button>}
+              {step < 4
+                ? <button className="btn btn-primary" onClick={() => { if (validateStep(step)) setStep(s => s + 1); }}>Next Step →</button>
+                : <button className="btn btn-primary" onClick={() => setConfirmSend(true)}><Icon name="send" size={13} /> Send to Vendors</button>
+              }
+            </div>
+          </div>
+        </div>
+
+        <ConfirmDialog open={confirmSend} title="Send RFQ to Vendors?" message={`This will send the RFQ to ${form.vendors.length} vendor(s). They will receive a notification to submit quotations.`} icon="send" confirmLabel="Send RFQ" confirmClass="btn-primary" onConfirm={() => { saveRfq('Sent'); setConfirmSend(false); }} onCancel={() => setConfirmSend(false)} />
+      </div>
+    );
+  }
+
+  if (view === 'detail' && selectedRfq) {
+    const rfqQuotes = quotations.filter(q => q.rfqId === selectedRfq.id);
+    const statusSteps = ['Draft', 'Sent', 'Quotations Received', 'Under Review', 'Closed'];
+    const currentStepIdx = statusSteps.indexOf(selectedRfq.status);
+    const isDraft  = selectedRfq.status === 'Draft';
+    const isSent   = selectedRfq.status === 'Sent' || selectedRfq.status === 'Quotations Received' || selectedRfq.status === 'Under Review';
+    const isClosed = selectedRfq.status === 'Closed';
+
+    return (
+      <div>
+        {/* ── Header with action buttons ── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-secondary" onClick={() => setView('list')}><Icon name="arrow_right" size={14} style={{ transform:'rotate(180deg)' }} /> Back</button>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <span className="mono" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 15 }}>{selectedRfq.rfqNumber}</span>
+                <StatusBadge status={selectedRfq.status} />
+                <span style={{ color: priorityColors[selectedRfq.priority], fontSize: 12, fontWeight: 600 }}>● {selectedRfq.priority}</span>
+              </div>
+              <h2 style={{ fontSize: 19, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedRfq.title}</h2>
+            </div>
+          </div>
+
+          {/* Action buttons based on status */}
+          {canCreate && (
+            <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+              {isDraft && (
+                <>
+                  <button className="btn btn-secondary" onClick={() => openEditRfq(selectedRfq)}>
+                    <Icon name="edit" size={13} /> Edit RFQ
+                  </button>
+                  <button className="btn btn-primary" onClick={() => setConfirmSendExisting(true)}>
+                    <Icon name="send" size={13} /> Send to Vendors
+                  </button>
+                </>
+              )}
+              {isSent && (
+                <>
+                  <button className="btn btn-secondary" onClick={() => { setCurrentPage('comparison'); }}>
+                    <Icon name="qa_compare" size={13} /> Compare Quotes
+                  </button>
+                  <button className="btn btn-warning" onClick={() => closeRfq(selectedRfq)} style={{ color: 'white' }}>
+                    <Icon name="ic_x" size={13} /> Close RFQ
+                  </button>
+                </>
+              )}
+              {isClosed && (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)', padding: '6px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 4 }}>
+                  RFQ Closed
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Status progress bar */}
+        <div className="card card-body" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {statusSteps.map((s, i) => (
+              <React.Fragment key={s}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 600, background: i <= currentStepIdx ? 'var(--primary)' : 'var(--surface)', color: i <= currentStepIdx ? 'white' : 'var(--text-muted)', border: i > currentStepIdx ? '2px solid var(--border)' : 'none' }}>
+                    {i < currentStepIdx ? <Icon name="check_sm" size={13} /> : i + 1}
+                  </div>
+                  <div style={{ fontSize: 11, marginTop: 4, fontWeight: i === currentStepIdx ? 600 : 400, color: i === currentStepIdx ? 'var(--primary)' : 'var(--text-muted)', textAlign: 'center', whiteSpace: 'nowrap' }}>{s}</div>
+                </div>
+                {i < statusSteps.length - 1 && <div style={{ flex: 1, height: 2, background: i < currentStepIdx ? 'var(--primary)' : 'var(--border)', margin: '0 4px', marginBottom: 16 }}></div>}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Confirm send existing RFQ */}
+        <ConfirmDialog
+          open={confirmSendExisting}
+          title="Send RFQ to Vendors?"
+          message={`This will send RFQ ${selectedRfq.rfqNumber} to ${selectedRfq.vendors?.length || 0} vendor(s). They will be notified to submit quotations.`}
+          confirmLabel="Send RFQ"
+          confirmClass="btn-primary"
+          onConfirm={() => sendExistingRfq(selectedRfq)}
+          onCancel={() => setConfirmSendExisting(false)}
+        />
+
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+          <div className="card">
+            <div className="card-header"><span className="card-title">RFQ Details</span></div>
+            <div className="card-body">
+              <div className="grid-2" style={{ gap: 14, marginBottom: 16 }}>
+                {[['Category', selectedRfq.category], ['Deadline', formatDate(selectedRfq.deadline)], ['Created', formatDate(selectedRfq.createdAt)]].map(([l, v]) => (
+                  <div key={l}><div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 500, marginTop: 2 }}>{v}</div></div>
+                ))}
+              </div>
+              {selectedRfq.description && <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.7 }}>{selectedRfq.description}</div>}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-header"><span className="card-title">Invited Vendors</span></div>
+            <div className="card-body" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {selectedRfq.vendors?.map(vId => {
+                const v = vendors.find(vn => vn.id === vId);
+                const q = quotations.find(q => q.rfqId === selectedRfq.id && q.vendorId === vId);
+                return v ? (
+                  <div key={vId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Avatar name={v.name} size={28} />
+                      <div><div style={{ fontSize: 13, fontWeight: 500 }}>{v.name}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{v.category}</div></div>
+                    </div>
+                    <StatusBadge status={q ? q.status : 'Not Submitted'} />
+                  </div>
+                ) : null;
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 20 }}>
+          <div className="card-header"><span className="card-title">Line Items</span><span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Est. Total: <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatCurrency(selectedRfq.lineItems?.reduce((s, li) => s + li.qty * li.estimatedPrice, 0))}</span></span></div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="data-table">
+              <thead><tr><th>#</th><th>Item Name</th><th>Description</th><th>Qty</th><th>Unit</th><th style={{ textAlign: 'right' }}>Est. Price</th><th style={{ textAlign: 'right' }}>Total</th></tr></thead>
+              <tbody>
+                {selectedRfq.lineItems?.map((li, i) => (
+                  <tr key={li.id}>
+                    <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>{i + 1}</td>
+                    <td style={{ fontWeight: 500 }}>{li.name}</td>
+                    <td style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{li.description}</td>
+                    <td><span className="mono">{li.qty}</span></td>
+                    <td>{li.unit}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(li.estimatedPrice)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}>{formatCurrency(li.qty * li.estimatedPrice)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="tabs" style={{ padding: '0 20px' }}>
+            <div className={`tab${rfqTab === 'quotations' ? ' active' : ''}`} onClick={() => setRfqTab('quotations')}>Quotations ({rfqQuotes.length})</div>
+            <div className={`tab${rfqTab === 'activity' ? ' active' : ''}`} onClick={() => setRfqTab('activity')}>Activity Log</div>
+          </div>
+          {rfqTab === 'quotations' && (
+            rfqQuotes.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-icon"><Icon name="quotations" size={40} /></div><div className="empty-state-title">No quotations yet</div><div className="empty-state-sub">Waiting for vendors to submit their quotations.</div></div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table">
+                  <thead><tr><th>Vendor</th><th>Grand Total</th><th>GST Rate</th><th>Delivery Date</th><th>Payment Terms</th><th>Status</th><th>Submitted</th></tr></thead>
+                  <tbody>
+                    {rfqQuotes.map(q => (
+                      <tr key={q.id}>
+                        <td style={{ fontWeight: 500 }}>{q.vendorName}</td>
+                        <td><span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatCurrency(q.grandTotal)}</span></td>
+                        <td>{q.gstRate}%</td>
+                        <td>{formatDate(q.deliveryDate)}</td>
+                        <td>{q.paymentTerms}</td>
+                        <td><StatusBadge status={q.status} /></td>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{q.submittedAt}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
+          {rfqTab === 'activity' && (
+            <div className="card-body">
+              <div className="timeline">
+                {INITIAL_LOGS.filter(l => l.entityId === selectedRfq.id || l.details?.includes(selectedRfq.rfqNumber)).slice(0, 8).map((l, i) => (
+                  <div key={l.id} className="timeline-item">
+                    <div className={`timeline-dot ${l.action === 'APPROVE' ? 'success' : l.action === 'REJECT' ? 'danger' : 'primary'}`}></div>
+                    <div><div style={{ fontWeight: 500, fontSize: 13 }}>{l.details}</div><div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{l.userName} · {l.timestamp}</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div><h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>RFQ Management</h2><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Manage procurement requests and vendor invitations</p></div>
+        {canCreate && <button className="btn btn-primary" onClick={() => { setView('create'); setStep(1); }}>+ Create RFQ</button>}
+      </div>
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search RFQs..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 180 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">All Status</option>
+              {RFQ_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{filtered.length} RFQ{filtered.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered.map(r => ({ ...r, _onClick: () => { setSelectedRfq(r); setView('detail'); setRfqTab('quotations'); } }))} loading={loading} emptyTitle="No RFQs found" emptySub={canCreate ? 'Create your first RFQ to start the procurement process.' : 'No RFQs match your criteria.'} emptyAction={canCreate ? <button className="btn btn-primary" onClick={() => { setView('create'); setStep(1); }}>+ Create RFQ</button> : null} />
+      </div>
+    </div>
+  );
+};
+
+
+// ═══════════════════════════════════════════════════
+// QUOTATION SCREENS (Vendor + Officer)
+// ═══════════════════════════════════════════════════
+
+const VendorRFQList = () => {
+  const { rfqs, quotations, currentUser, setCurrentPage, vendors } = useApp();
+  const myVendorId = currentUser?.vendorId;
+  const myRfqs = myVendorId ? rfqs.filter(r => r.vendors?.includes(myVendorId) && r.status !== 'Draft') : [];
+  const [selectedRfq, setSelectedRfq] = useState(null);
+
+  if (selectedRfq) return <SubmitQuotation rfq={selectedRfq} onBack={() => setSelectedRfq(null)} />;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>My RFQs</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>RFQs you have been invited to respond to</p>
+      </div>
+      {myRfqs.length === 0 ? (
+        <div className="card"><div className="empty-state"><div className="empty-state-icon" style={{ fontSize: 48 }}>📋</div><div className="empty-state-title">No RFQs assigned</div><div className="empty-state-sub">You have not been invited to any active RFQs yet.</div></div></div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {myRfqs.map(rfq => {
+            const myQuote = quotations.find(q => q.rfqId === rfq.id && q.vendorId === myVendorId);
+            const days = daysUntil(rfq.deadline);
+            return (
+              <div key={rfq.id} className="card card-body" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span className="mono" style={{ color: 'var(--primary)', fontWeight: 600 }}>{rfq.rfqNumber}</span>
+                    <StatusBadge status={myQuote ? myQuote.status : 'Not Submitted'} />
+                    <span style={{ fontSize: 12, color: rfq.priority === 'High' ? '#DC2626' : rfq.priority === 'Medium' ? '#D97706' : '#16A34A', fontWeight: 600 }}>● {rfq.priority}</span>
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>{rfq.title}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>{rfq.category} · {rfq.lineItems?.length || 0} items</div>
+                  <div style={{ display: 'flex', gap: 20, fontSize: 13 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Deadline: <span className={days !== null && days < 3 ? 'deadline-urgent' : days !== null && days < 7 ? 'deadline-warning' : ''} style={{ color: days !== null && days < 3 ? '#DC2626' : days !== null && days < 7 ? '#D97706' : 'var(--text-primary)', fontWeight: days !== null && days < 7 ? 500 : 400 }}>{formatDate(rfq.deadline)}</span></span>
+                    {days !== null && <span className={days < 0 ? 'deadline-urgent' : days < 3 ? 'deadline-urgent' : 'deadline-warning'} style={{ fontSize: 12 }}>{days < 0 ? '⚠ Overdue' : days < 3 ? `⚠ ${days}d left` : `${days} days remaining`}</span>}
+                    {myQuote && <span style={{ color: 'var(--text-muted)' }}>Quoted: <span className="mono" style={{ color: 'var(--primary)', fontWeight: 600 }}>{formatCurrency(myQuote.grandTotal)}</span></span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexShrink: 0, marginLeft: 24 }}>
+                  {!myQuote ? (
+                    <button className="btn btn-primary" onClick={() => setSelectedRfq(rfq)}>Submit Quotation</button>
+                  ) : rfq.status === 'Sent' ? (
+                    <button className="btn btn-secondary" onClick={() => setSelectedRfq(rfq)}>Edit Quotation</button>
+                  ) : (
+                    <button className="btn btn-secondary" onClick={() => setSelectedRfq(rfq)}>View Quotation</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SubmitQuotation = ({ rfq, onBack }) => {
+  const { quotations, setQuotations, rfqs, setRfqs, vendors, currentUser, showToast, addLog, addNotification } = useApp();
+  const myVendorId = currentUser?.vendorId;
+  const myVendor = vendors.find(v => v.id === myVendorId);
+  const existingQuote = myVendorId ? quotations.find(q => q.rfqId === rfq.id && q.vendorId === myVendorId) : null;
+  const canEdit = rfq.status === 'Sent';
+
+  const [lineItems, setLineItems] = useState(existingQuote?.lineItems || rfq.lineItems.map(li => ({ ...li, unitPrice: li.estimatedPrice || 0, subtotal: (li.estimatedPrice || 0) * li.qty })));
+  const [deliveryDate, setDeliveryDate] = useState(existingQuote?.deliveryDate || '');
+  const [paymentTerms, setPaymentTerms] = useState(existingQuote?.paymentTerms || 'Net 30');
+  const [validityPeriod, setValidityPeriod] = useState(existingQuote?.validityPeriod || '30 days');
+  const [gstRate, setGstRate] = useState(existingQuote?.gstRate || 18);
+  const [notes, setNotes] = useState(existingQuote?.notes || '');
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+
+  const updateItem = (id, field, value) => {
+    setLineItems(prev => prev.map(li => {
+      if (li.id !== id) return li;
+      const updated = { ...li, [field]: value };
+      if (field === 'unitPrice' || field === 'qty') updated.subtotal = Number(updated.unitPrice || 0) * Number(updated.qty || 0);
+      return updated;
+    }));
+  };
+
+  const subtotal = lineItems.reduce((s, li) => s + (li.subtotal || 0), 0);
+  const gstAmount = (subtotal * Number(gstRate)) / 100;
+  const grandTotal = subtotal + gstAmount;
+
+  const validate = () => {
+    const e = {};
+    if (lineItems.some(li => !li.unitPrice || li.unitPrice <= 0)) e.lineItems = 'All items must have a valid price';
+    if (!deliveryDate) e.deliveryDate = 'Delivery date is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const saveQuotation = async (isDraft) => {
+    if (!isDraft && !validate()) return;
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 500));
+    const quoteData = {
+      id: existingQuote?.id || generateId('q'),
+      rfqId: rfq.id, vendorId: myVendorId,
+      vendorName: myVendor?.name || currentUser?.name || 'Vendor',
+      lineItems, subtotal, gstRate: Number(gstRate), gstAmount, grandTotal,
+      deliveryDate, paymentTerms, validityPeriod, notes,
+      status: isDraft ? 'Submitted' : 'Submitted',
+      submittedAt: new Date().toLocaleString('en-IN'),
+    };
+    if (existingQuote) {
+      setQuotations(prev => prev.map(q => q.id === existingQuote.id ? quoteData : q));
+      addLog('UPDATE', 'Quotation', quoteData.id, `Updated quotation for ${rfq.rfqNumber} — Total: ${formatCurrency(grandTotal)}`);
+    } else {
+      setQuotations(prev => [quoteData, ...prev]);
+      addLog('CREATE', 'Quotation', quoteData.id, `Submitted quotation for ${rfq.rfqNumber} — Total: ${formatCurrency(grandTotal)}`);
+      addNotification('quotation', `New quotation received from ${currentUser?.name} for ${rfq.rfqNumber}`, 'u2');
+      addNotification('quotation', `New quotation received from ${currentUser?.name} for ${rfq.rfqNumber}`, 'u1');
+    }
+    // ── Auto-update RFQ status so Comparison page can pick it up ──────────
+    setRfqs(prev => prev.map(r => {
+      if (r.id !== rfq.id) return r;
+      // Count quotes already submitted (including this new one)
+      const existingCount = quotations.filter(q => q.rfqId === rfq.id && q.id !== quoteData.id).length;
+      const totalNow = existingCount + 1;
+      const vendorCount = r.vendors?.length || 1;
+      if (r.status === 'Sent' || r.status === 'Draft') {
+        // Mark as 'Quotations Received' as soon as ANY quote is received
+        return { ...r, status: totalNow >= 1 ? 'Quotations Received' : 'Sent' };
+      }
+      return r;
+    }));
+    showToast(isDraft ? 'Quotation saved' : 'Quotation submitted successfully!', 'success');
+    setSaving(false);
+    setConfirmSubmit(false);
+    onBack();
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button className="btn btn-secondary" onClick={onBack}>← Back</button>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="mono" style={{ color: 'var(--primary)', fontWeight: 600 }}>{rfq.rfqNumber}</span>
+            <StatusBadge status={rfq.status} />
+          </div>
+          <h2 style={{ fontSize: 18, fontWeight: 600 }}>{existingQuote ? 'Edit Quotation' : 'Submit Quotation'}: {rfq.title}</h2>
+        </div>
+      </div>
+
+      {existingQuote && !canEdit && (
+        <div style={{ marginBottom: 16, padding: '10px 16px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: 8, color: '#92400E', fontSize: 13 }}>
+          ℹ This RFQ is no longer accepting new quotations. Showing your submitted quotation in read-only mode.
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Line Items */}
+          <div className="card">
+            <div className="card-header"><span className="card-title">Line Items — Enter Your Pricing</span></div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--surface)' }}>
+                    {['Item', 'Qty', 'Unit', 'Unit Price (₹) *', 'Subtotal'].map(h => <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{h}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineItems.map((li, i) => (
+                    <tr key={li.id} style={{ background: i % 2 === 0 ? 'white' : 'var(--surface)' }}>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ fontWeight: 500 }}>{li.name}</div>
+                        {li.description && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{li.description}</div>}
+                      </td>
+                      <td style={{ padding: '10px 14px' }}><span className="mono">{li.qty}</span></td>
+                      <td style={{ padding: '10px 14px' }}>{li.unit}</td>
+                      <td style={{ padding: '10px 6px' }}>
+                        {canEdit || !existingQuote ? (
+                          <input className="form-input mono" type="number" min="0" value={li.unitPrice} onChange={e => updateItem(li.id, 'unitPrice', Number(e.target.value))} style={{ width: 120 }} disabled={existingQuote && !canEdit} />
+                        ) : <span className="mono">{formatCurrency(li.unitPrice)}</span>}
+                      </td>
+                      <td style={{ padding: '10px 14px', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}>{formatCurrency(li.subtotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {errors.lineItems && <div style={{ padding: '8px 14px', color: '#DC2626', fontSize: 13 }}>{errors.lineItems}</div>}
+          </div>
+
+          {/* Terms */}
+          <div className="card card-body">
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Quotation Terms</div>
+            <div className="grid-2" style={{ gap: 16 }}>
+              <div className="form-group">
+                <label className="form-label">Delivery Date <span className="req">*</span></label>
+                <input className={`form-input${errors.deliveryDate ? ' error' : ''}`} type="date" value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} disabled={existingQuote && !canEdit} />
+                {errors.deliveryDate && <span className="form-error">{errors.deliveryDate}</span>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Payment Terms</label>
+                <select className="form-select" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} disabled={existingQuote && !canEdit}>
+                  {PAYMENT_TERMS.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">GST Rate (%)</label>
+                <select className="form-select" value={gstRate} onChange={e => setGstRate(e.target.value)} disabled={existingQuote && !canEdit}>
+                  {GST_RATES.map(r => <option key={r} value={r}>{r}%</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Validity Period</label>
+                <select className="form-select" value={validityPeriod} onChange={e => setValidityPeriod(e.target.value)} disabled={existingQuote && !canEdit}>
+                  {VALIDITY_PERIODS.map(v => <option key={v}>{v}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                <label className="form-label">Notes / Comments</label>
+                <textarea className="form-textarea" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional terms, conditions, or notes for the buyer..." rows={3} disabled={existingQuote && !canEdit} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Summary sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card card-body" style={{ position: 'sticky', top: 80 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Quotation Summary</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Subtotal</span>
+                <span className="mono" style={{ fontWeight: 500 }}>{formatCurrency(subtotal)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>GST ({gstRate}%)</span>
+                <span className="mono">{formatCurrency(gstAmount)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>CGST ({Number(gstRate)/2}%)</span>
+                <span className="mono">{formatCurrency(gstAmount / 2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: 'var(--text-secondary)' }}>SGST ({Number(gstRate)/2}%)</span>
+                <span className="mono">{formatCurrency(gstAmount / 2)}</span>
+              </div>
+              <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }}></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Grand Total</span>
+                <span className="mono" style={{ fontWeight: 600, fontSize: 20, color: 'var(--primary)' }}>{formatCurrency(grandTotal)}</span>
+              </div>
+            </div>
+            {(canEdit || !existingQuote) && (
+              <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button className="btn btn-primary" style={{ height: 42 }} onClick={() => setConfirmSubmit(true)} disabled={saving}>
+                  {saving ? <><div className="spinner"></div>&nbsp;Submitting...</> : existingQuote ? 'Update Quotation' : 'Submit Quotation'}
+                </button>
+              </div>
+            )}
+            {existingQuote && (
+              <div style={{ marginTop: 16, padding: '10px 12px', background: 'var(--surface)', borderRadius: 6, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500, marginBottom: 4 }}>Submitted At</div>
+                <div style={{ fontSize: 13 }}>{existingQuote.submittedAt}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <ConfirmDialog open={confirmSubmit} title="Submit Quotation?" message="Once submitted, the buyer will be notified. You can edit this quotation only while the RFQ is still open." icon="approve" confirmLabel="Submit Quotation" confirmClass="btn-primary" onConfirm={() => saveQuotation(false)} onCancel={() => setConfirmSubmit(false)} />
+    </div>
+  );
+};
+
+const MyQuotations = () => {
+  const { quotations, rfqs, currentUser, vendors } = useApp();
+  const myVendorId = currentUser?.vendorId;
+  const myQuotes = myVendorId ? quotations.filter(q => q.vendorId === myVendorId) : [];
+
+  const columns = [
+    { key: 'rfq', label: 'RFQ', render: q => { const rfq = rfqs.find(r => r.id === q.rfqId); return <div><span className="mono" style={{ color: 'var(--primary)', fontSize: 13 }}>{rfq?.rfqNumber}</span><div style={{ fontSize: 13, fontWeight: 500, marginTop: 2 }}>{rfq?.title}</div></div>; } },
+    { key: 'subtotal', label: 'Subtotal', render: q => <span className="mono">{formatCurrency(q.subtotal)}</span> },
+    { key: 'gst', label: 'GST', render: q => <span>{q.gstRate}% ({formatCurrency(q.gstAmount)})</span> },
+    { key: 'grandTotal', label: 'Grand Total', render: q => <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatCurrency(q.grandTotal)}</span> },
+    { key: 'deliveryDate', label: 'Delivery', render: q => formatDate(q.deliveryDate) },
+    { key: 'paymentTerms', label: 'Payment Terms' },
+    { key: 'status', label: 'Status', render: q => <StatusBadge status={q.status} /> },
+    { key: 'submittedAt', label: 'Submitted', render: q => <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{q.submittedAt}</span> },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>My Quotations</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>All quotations submitted by you</p>
+      </div>
+      <div className="card">
+        <DataTable columns={columns} data={myQuotes} emptyTitle="No quotations submitted" emptySub="You have not submitted any quotations yet. Browse your assigned RFQs to get started." />
+      </div>
+    </div>
+  );
+};
+
+const QuotationsList = () => {
+  const { quotations, rfqs, vendors } = useApp();
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setTimeout(() => setLoading(false), 500); }, []);
+
+  const filtered = useMemo(() => quotations.filter(q => {
+    const rfq = rfqs.find(r => r.id === q.rfqId);
+    const s = search.toLowerCase();
+    const matchSearch = !s || q.vendorName?.toLowerCase().includes(s) || rfq?.rfqNumber?.toLowerCase().includes(s) || rfq?.title?.toLowerCase().includes(s);
+    const matchStatus = !filterStatus || q.status === filterStatus;
+    return matchSearch && matchStatus;
+  }), [quotations, rfqs, search, filterStatus]);
+
+  const columns = [
+    { key: 'rfq', label: 'RFQ', render: q => { const rfq = rfqs.find(r => r.id === q.rfqId); return <div><span className="mono" style={{ color: 'var(--primary)', fontSize: 12 }}>{rfq?.rfqNumber}</span><div style={{ fontWeight: 500, fontSize: 13, marginTop: 2 }}>{rfq?.title}</div></div>; } },
+    { key: 'vendorName', label: 'Vendor', render: q => <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={q.vendorName} size={26} />{q.vendorName}</div> },
+    { key: 'grandTotal', label: 'Grand Total', render: q => <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatCurrency(q.grandTotal)}</span> },
+    { key: 'gstRate', label: 'GST', render: q => `${q.gstRate}%` },
+    { key: 'deliveryDate', label: 'Delivery Date', render: q => formatDate(q.deliveryDate) },
+    { key: 'paymentTerms', label: 'Payment Terms' },
+    { key: 'validityPeriod', label: 'Validity' },
+    { key: 'status', label: 'Status', render: q => <StatusBadge status={q.status} /> },
+    { key: 'submittedAt', label: 'Submitted', render: q => <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{q.submittedAt}</span> },
+  ];
+
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Quotations</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>All vendor quotations across all RFQs</p>
+      </div>
+      <div className="card">
+        <div className="card-body" style={{ paddingBottom: 0 }}>
+          <div className="filter-bar">
+            <div className="search-wrap" style={{ flex: 1, maxWidth: 320 }}>
+              <span className="search-icon" style={{ display:"flex", alignItems:"center", color:"var(--text-muted)" }}><Icon name="search" size={14} /></span>
+              <input className="form-input" placeholder="Search quotations..." value={search} onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36 }} />
+            </div>
+            <select className="form-select" style={{ width: 160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">All Status</option>
+              {['Submitted','Selected','Rejected'].map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+        <DataTable columns={columns} data={filtered} loading={loading} emptyTitle="No quotations" emptySub="No vendor quotations have been submitted yet." />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// QUOTATION COMPARISON
+// ═══════════════════════════════════════════════════
+
+const QuotationComparison = () => {
+  const { rfqs, quotations, vendors, approvals, setApprovals, setRfqs, setQuotations, showToast, addLog, addNotification, currentUser, setCurrentPage } = useApp();
+  const [selectedRfqId, setSelectedRfqId] = useState('');
+  const [selectedVendorId, setSelectedVendorId] = useState(null);
+  const [confirmSelect, setConfirmSelect] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // ── Statuses that disqualify an RFQ from the comparison page ────────────
+  const EXCLUDED_STATUSES = [
+    'Approval Pending', 'Under Review', 'Approved', 'Rejected',
+    'Closed', 'PO Generated', 'Invoice Generated', 'Draft',
+  ];
+
+  // Only show RFQs that: have ≥1 active quotation AND are not already in the approval pipeline
+  const comparableRfqs = rfqs.filter(r => {
+    if (EXCLUDED_STATUSES.includes(r.status)) return false;
+    return quotations.some(q => q.rfqId === r.id && q.status !== 'Rejected');
+  });
+
+  const rfq      = rfqs.find(r => r.id === selectedRfqId);
+  const rfqQuotes = rfq
+    ? quotations.filter(q => q.rfqId === rfq.id && q.status !== 'Rejected')
+    : [];
+
+  // Auto-clear selection when the chosen RFQ disappears from the eligible list
+  useEffect(() => {
+    if (selectedRfqId && !comparableRfqs.find(r => r.id === selectedRfqId)) {
+      setSelectedRfqId('');
+      setSelectedVendorId(null);
+    }
+  }, [comparableRfqs.length, selectedRfqId]);
+
+  const getMin = (field, arr) => { const v = arr.map(q => q[field]).filter(x => x != null); return v.length ? Math.min(...v) : null; };
+  const getMax = (field, arr) => { const v = arr.map(q => q[field]).filter(x => x != null); return v.length ? Math.max(...v) : null; };
+
+  const minTotal = getMin('grandTotal', rfqQuotes);
+  const maxTotal = getMax('grandTotal', rfqQuotes);
+
+  // ── SEND FOR APPROVAL ────────────────────────────────────────────────────
+  const selectVendor = async () => {
+    if (!selectedVendorId || !rfq) return;
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 600));
+
+    const vendor = vendors.find(v => v.id === selectedVendorId);
+    const quote  = rfqQuotes.find(q => q.vendorId === selectedVendorId);
+    if (!quote) {
+      setSaving(false);
+      showToast('Quotation not found. Please refresh and try again.', 'error');
+      return;
+    }
+
+    // 1 ─ Create pending approval record
+    const newApproval = {
+      id:           generateId('ap'),
+      rfqId:        rfq.id,
+      rfqNumber:    rfq.rfqNumber,
+      quotationId:  quote.id,
+      vendorId:     selectedVendorId,
+      vendorName:   vendor?.name || '',
+      totalAmount:  quote.grandTotal,
+      requestedBy:  currentUser.id,
+      requestedAt:  new Date().toLocaleString('en-IN'),
