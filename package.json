@@ -1,0 +1,12 @@
+{
+  "name": "vendorbridge",
+  "version": "1.0.0",
+  "description": "Procurement and vendor management ERP built with React",
+  "private": true,
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . --listen 3000"
+  },
+  "keywords": ["procurement", "erp", "vendor-management", "rfq", "purchase-order"],
+  "author": "Smit Patel"
+}
