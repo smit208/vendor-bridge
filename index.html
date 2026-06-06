@@ -3722,4 +3722,662 @@ const QuotationComparison = () => {
       vendorName:   vendor?.name || '',
       totalAmount:  quote.grandTotal,
       requestedBy:  currentUser.id,
-      requestedAt:  new Date().toLocaleString('en-IN'),
+      requestedAt:  new Date().toLocaleString('en-IN'),
+      status:       'Pending',
+      reviewedBy:   null,
+      reviewedAt:   null,
+      remarks:      '',
+      poId:         null,
+    };
+    setApprovals(prev => [newApproval, ...prev]);
+
+    // 2 ─ Move RFQ to "Approval Pending" → instantly removed from this page
+    setRfqs(prev => prev.map(r =>
+      r.id === rfq.id ? { ...r, status: 'Approval Pending' } : r
+    ));
+
+    // 3 ─ Mark winning quote "Selected", losers "Rejected"
+    setQuotations(prev => prev.map(q => {
+      if (q.rfqId !== rfq.id) return q;
+      return { ...q, status: q.vendorId === selectedVendorId ? 'Selected' : 'Rejected' };
+    }));
+
+    // 4 ─ Notify manager + logs
+    addLog('CREATE', 'Approval', newApproval.id,
+      `Approval initiated for ${rfq.rfqNumber} — Selected: ${vendor?.name} (${formatCurrency(quote.grandTotal)})`);
+    addNotification('approval', `Approval required: ${rfq.rfqNumber} — ${vendor?.name}`, 'u4');
+    addNotification('approval', `Approval required: ${rfq.rfqNumber} — ${vendor?.name}`, 'u1');
+
+    showToast(`Sent for approval! ${vendor?.name} selected for ${rfq.rfqNumber}.`, 'success');
+
+    // 5 ─ Reset local UI state (useEffect will also clear selectedRfqId)
+    setSaving(false);
+    setConfirmSelect(false);
+    setSelectedVendorId(null);
+    setSelectedRfqId('');
+  };
+
+  const comparisonChartData = rfqQuotes.length > 0 ? {
+    labels: rfqQuotes.map(q => q.vendorName),
+    datasets: [{
+      label: 'Grand Total (₹)',
+      data: rfqQuotes.map(q => q.grandTotal),
+      backgroundColor: rfqQuotes.map(q =>
+        q.grandTotal === minTotal ? '#16A34A' : q.grandTotal === maxTotal ? '#DC2626' : '#1B4FD8'
+      ),
+      borderRadius: 4,
+    }]
+  } : null;
+
+  // ── RENDER ───────────────────────────────────────────────────────────────
+  return (
+    <div>
+      <div style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Quotation Comparison</h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+          Compare vendor quotations side-by-side and select the best offer for approval
+        </p>
+      </div>
+
+      {/* ── RFQ Selector ── */}
+      <div className="card card-body" style={{ marginBottom: 20 }}>
+        <label className="form-label" style={{ marginBottom: 8, display: 'block' }}>
+          Select RFQ to Compare
+          <span style={{ marginLeft: 10, fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>
+            ({comparableRfqs.length} available)
+          </span>
+        </label>
+
+        {comparableRfqs.length === 0 ? (
+          <div style={{ padding: '28px 0', textAlign: 'center' }}>
+            <div style={{ marginBottom: 12 }}>
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C0C7CF" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-primary)', marginBottom: 6 }}>
+              No RFQs available for comparison
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 400, margin: '0 auto', lineHeight: 1.6 }}>
+              RFQs sent for approval or already processed will not appear here.
+              New RFQs will show once vendors submit their quotations.
+            </div>
+            <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={() => setCurrentPage('rfqs')}>
+              View RFQ Management
+            </button>
+          </div>
+        ) : (
+          <select
+            className="form-select"
+            value={selectedRfqId}
+            onChange={e => { setSelectedRfqId(e.target.value); setSelectedVendorId(null); }}
+          >
+            <option value="">— Select an RFQ —</option>
+            {comparableRfqs.map(r => {
+              const qCount = quotations.filter(q => q.rfqId === r.id && q.status !== 'Rejected').length;
+              return (
+                <option key={r.id} value={r.id}>
+                  {r.rfqNumber} — {r.title} ({qCount} quote{qCount !== 1 ? 's' : ''})
+                </option>
+              );
+            })}
+          </select>
+        )}
+      </div>
+
+      {/* ── No quotations yet ── */}
+      {rfq && rfqQuotes.length === 0 && (
+        <div className="card">
+          <div className="empty-state">
+            <div style={{ marginBottom: 8 }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#C0C7CF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              </svg>
+            </div>
+            <div className="empty-state-title">No quotations received yet</div>
+            <div className="empty-state-sub">Waiting for vendors to submit quotations for {rfq.rfqNumber}.</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Full comparison view ── */}
+      {rfq && rfqQuotes.length > 0 && (
+        <>
+          {/* RFQ info banner */}
+          <div className="card card-body" style={{ marginBottom: 16, background: 'var(--primary-light)', border: '1px solid rgba(27,79,216,0.15)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="mono" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 15 }}>{rfq.rfqNumber}</span>
+                  <StatusBadge status={rfq.status} />
+                </div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginTop: 2 }}>{rfq.title}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+                  Deadline: {formatDate(rfq.deadline)} · {rfqQuotes.length} quotation{rfqQuotes.length !== 1 ? 's' : ''} received
+                </div>
+              </div>
+              {selectedVendorId && (
+                <div style={{ padding: '8px 14px', background: 'white', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13 }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Selected: </span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{vendors.find(v => v.id === selectedVendorId)?.name}</span>
+                  {' — '}
+                  <span className="mono" style={{ fontWeight: 600 }}>{formatCurrency(rfqQuotes.find(q => q.vendorId === selectedVendorId)?.grandTotal)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Vendor cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(rfqQuotes.length, 3)}, 1fr)`, gap: 16, marginBottom: 20 }}>
+            {rfqQuotes.map(q => {
+              const vendor     = vendors.find(v => v.id === q.vendorId);
+              const isMin      = q.grandTotal === minTotal;
+              const isMax      = q.grandTotal === maxTotal && rfqQuotes.length > 1;
+              const isSelected = selectedVendorId === q.vendorId;
+              return (
+                <div
+                  key={q.id}
+                  className={`compare-vendor-card${isSelected ? ' selected' : ''}`}
+                  onClick={() => setSelectedVendorId(q.vendorId === selectedVendorId ? null : q.vendorId)}
+                  style={{ cursor: 'pointer', transition: 'all 150ms ease' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <input type="radio" checked={isSelected} onChange={() => setSelectedVendorId(q.vendorId)} onClick={e => e.stopPropagation()} style={{ accentColor: 'var(--primary)', width: 16, height: 16, flexShrink: 0 }} />
+                    <Avatar name={q.vendorName} size={32} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{q.vendorName}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Stars rating={vendor?.rating || 3} />
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({vendor?.rating ?? '—'})</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.6px' }}>Grand Total</div>
+                    <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: isMin ? '#16A34A' : isMax ? '#DC2626' : 'var(--primary)' }}>{formatCurrency(q.grandTotal)}</div>
+                    {isMin && <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 600, marginTop: 4 }}>✓ Lowest Quote</div>}
+                    {isMax && <div style={{ fontSize: 11, color: '#DC2626', fontWeight: 600, marginTop: 4 }}>↑ Highest Quote</div>}
+                  </div>
+                  {[['Delivery', formatDate(q.deliveryDate)], ['Payment', q.paymentTerms], ['Validity', q.validityPeriod], ['GST Rate', `${q.gstRate}%`]].map(([l, v]) => (
+                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>{l}:</span>
+                      <span style={{ fontWeight: 500 }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Bar chart */}
+          {comparisonChartData && (
+            <div className="card card-body" style={{ marginBottom: 20 }}>
+              <div className="card-title" style={{ marginBottom: 16 }}>Grand Total Comparison</div>
+              <ChartComponent type="bar" data={comparisonChartData} options={{ indexAxis: 'y', scales: { x: { ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'K', font: { family: 'DM Sans' } } } }, plugins: { legend: { display: false } } }} height={rfqQuotes.length * 70 + 60} />
+            </div>
+          )}
+
+          {/* Comparison Table */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div className="card-header"><span className="card-title">Line-by-Line Price Comparison</span><span style={{ fontSize: 13, color: 'var(--text-muted)' }}><span style={{ color: '#16A34A', fontWeight: 600 }}>Green = Lowest</span> · <span style={{ color: '#DC2626', fontWeight: 600 }}>Red = Highest</span></span></div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    {rfqQuotes.map(q => <th key={q.vendorId} style={{ textAlign: 'right' }}>{q.vendorName}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rfq.lineItems?.map(li => {
+                    const prices = rfqQuotes.map(q => q.lineItems?.find(l => l.id === li.id)?.unitPrice);
+                    const minP = Math.min(...prices.filter(p => p != null));
+                    const maxP = Math.max(...prices.filter(p => p != null));
+                    return (
+                      <tr key={li.id}>
+                        <td><div style={{ fontWeight: 500 }}>{li.name}</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{li.description}</div></td>
+                        <td><span className="mono">{li.qty} {li.unit}</span></td>
+                        {rfqQuotes.map(q => {
+                          const price = q.lineItems?.find(l => l.id === li.id)?.unitPrice;
+                          const isBest = price === minP && prices.filter(p => p != null).length > 1;
+                          const isWorst = price === maxP && prices.filter(p => p != null).length > 1;
+                          return (
+                            <td key={q.vendorId} style={{ textAlign: 'right' }} className={isBest ? 'compare-cell-best' : isWorst ? 'compare-cell-worst' : ''}>
+                              {price != null ? <span className="mono" style={{ fontWeight: isBest ? 600 : 400, color: isBest ? '#166534' : isWorst ? '#991B1B' : 'inherit' }}>{formatCurrency(price)}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                  {/* Summary rows */}
+                  {[['Subtotal', 'subtotal'], ['GST', 'gstAmount'], ['Grand Total', 'grandTotal']].map(([label, field]) => (
+                    <tr key={field} style={{ fontWeight: field === 'grandTotal' ? 600 : 400, background: field === 'grandTotal' ? 'var(--primary-light)' : undefined }}>
+                      <td colSpan={2} style={{ fontWeight: 600 }}>{label}</td>
+                      {rfqQuotes.map(q => {
+                        const val = q[field];
+                        const isMin = val === getMin(field, rfqQuotes) && rfqQuotes.length > 1;
+                        const isMax = val === getMax(field, rfqQuotes) && rfqQuotes.length > 1;
+                        return (
+                          <td key={q.vendorId} style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }} className={isMin ? 'compare-cell-best' : isMax ? 'compare-cell-worst' : ''}>
+                            <span style={{ color: isMin ? '#166534' : isMax ? '#991B1B' : 'inherit' }}>{formatCurrency(val)}</span>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {[['Delivery Date', 'deliveryDate', (v) => formatDate(v)], ['Payment Terms', 'paymentTerms', v => v], ['Validity', 'validityPeriod', v => v]].map(([label, field, fmt]) => (
+                    <tr key={field}>
+                      <td colSpan={2}>{label}</td>
+                      {rfqQuotes.map(q => <td key={q.vendorId} style={{ textAlign: 'right' }}>{fmt(q[field])}</td>)}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Action */}
+          <div className="card card-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              {selectedVendorId ? (
+                <div style={{ fontWeight: 500 }}>Selected: <span style={{ color: 'var(--primary)', fontWeight: 600 }}>{vendors.find(v => v.id === selectedVendorId)?.name}</span> — {formatCurrency(rfqQuotes.find(q => q.vendorId === selectedVendorId)?.grandTotal)}</div>
+              ) : <div style={{ color: 'var(--text-muted)' }}>Select a vendor card above to proceed</div>}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn btn-secondary" onClick={() => showToast('Notification sent to all vendors', 'info')}>Request More Info</button>
+              <button className="btn btn-primary" onClick={() => setConfirmSelect(true)} disabled={!selectedVendorId}>Select Vendor & Send for Approval</button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <ConfirmDialog
+        open={confirmSelect}
+        title="Select Vendor?"
+        icon="approve"
+        message={selectedVendorId ? `You are selecting "${vendors.find(v => v.id === selectedVendorId)?.name}" for this procurement. This will initiate the approval workflow.` : ''}
+        confirmLabel="Confirm Selection"
+        confirmClass="btn-primary"
+        onConfirm={selectVendor}
+        onCancel={() => setConfirmSelect(false)}
+      />
+    </div>
+  );
+};
+
+
+// ═══════════════════════════════════════════════════
+// APPROVALS SCREEN
+// ═══════════════════════════════════════════════════
+
+const ApprovalsScreen = () => {
+  const { approvals, setApprovals, rfqs, quotations, vendors, users, pos, setPos, setRfqs, setQuotations, currentUser, showToast, addLog, addNotification } = useApp();
+  const [filterStatus, setFilterStatus] = useState('');
+  const [selectedApproval, setSelectedApproval] = useState(null);
+  const [remarks, setRemarks] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null); // 'approve' | 'reject'
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { setTimeout(() => setLoading(false), 500); }, []);
+
+  const canApprove = [ROLES.ADMIN, ROLES.MANAGER].includes(currentUser?.role);
+  const filtered = useMemo(() => approvals.filter(a => !filterStatus || a.status === filterStatus), [approvals, filterStatus]);
+
+  const processAction = async (action) => {
+    if (!selectedApproval) return;
+    setSaving(true);
+    await new Promise(r => setTimeout(r, 700));
+
+    const now = new Date().toLocaleString('en-IN');
+    const updatedApproval = { ...selectedApproval, status: action === 'approve' ? 'Approved' : 'Rejected', reviewedBy: currentUser.id, reviewedAt: now, remarks };
+
+    if (action === 'approve') {
+      const count = pos.length + 1;
+      const poNumber = generatePONumber(count);
+      const rfq = rfqs.find(r => r.id === selectedApproval.rfqId);
+      const quote = quotations.find(q => q.id === selectedApproval.quotationId);
+      const vendor = vendors.find(v => v.id === selectedApproval.vendorId);
+
+      const cgst = (quote?.subtotal || 0) * (quote?.gstRate || 18) / 200;
+      const sgst = cgst;
+
+      const newPO = {
+        id: generateId('po'), poNumber,
+        rfqId: rfq?.id, rfqNumber: rfq?.rfqNumber,
+        approvalId: selectedApproval.id,
+        quotationId: selectedApproval.quotationId,
+        vendorId: selectedApproval.vendorId,
+        vendorName: selectedApproval.vendorName,
+        lineItems: quote?.lineItems?.map(li => ({ ...li, total: li.subtotal || li.qty * li.unitPrice })) || [],
+        subtotal: quote?.subtotal || 0,
+        cgst, sgst, igst: 0,
+        gstTotal: cgst + sgst,
+        grandTotal: quote?.grandTotal || 0,
+        poDate: new Date().toISOString().split('T')[0],
+        deliveryDate: quote?.deliveryDate || '',
+        paymentTerms: quote?.paymentTerms || 'Net 30',
+        status: 'Generated',
+        invoiceId: null,
+        notes: '',
+        createdBy: currentUser.id,
+      };
+
+      setPos(prev => [newPO, ...prev]);
+      updatedApproval.poId = newPO.id;
+      setRfqs(prev => prev.map(r => r.id === rfq?.id ? { ...r, status: 'Closed' } : r));
+
+      addLog('APPROVE', 'Approval', selectedApproval.id, `Approved procurement for ${vendor?.name}. Remarks: ${remarks || 'None'}`);
+      addLog('GENERATE', 'PO', newPO.id, `Auto-generated ${poNumber} from approval`);
+      addNotification('po', `Purchase Order ${poNumber} generated for ${rfq?.rfqNumber}`, 'u2');
+      // Find the vendor's user account to notify them
+      const vendorUser = users.find(u => u.vendorId === selectedApproval.vendorId);
+      if (vendorUser) addNotification('po', `Purchase Order ${poNumber} received from VendorBridge Corp`, vendorUser.id);
+      showToast(`Approved! Purchase Order ${poNumber} created.`, 'success');
+    } else {
+      addLog('REJECT', 'Approval', selectedApproval.id, `Rejected procurement. Reason: ${remarks}`);
+      addNotification('approval', `Approval rejected for ${rfqs.find(r => r.id === selectedApproval.rfqId)?.rfqNumber}. Please review.`, 'u2');
+      showToast('Procurement request rejected.', 'warning');
+    }
+
+    setApprovals(prev => prev.map(a => a.id === selectedApproval.id ? updatedApproval : a));
+    setSaving(false);
+    setConfirmAction(null);
+    setSelectedApproval(null);
+    setRemarks('');
+  };
+
+  const columns = [
+    { key: 'id', label: 'Approval ID', render: a => <span className="mono" style={{ color: 'var(--primary)', fontSize: 13 }}>{a.id.slice(0, 12)}</span> },
+    { key: 'rfq', label: 'RFQ', render: a => { const rfq = rfqs.find(r => r.id === a.rfqId); return <div><span className="mono" style={{ fontSize: 12, color: 'var(--primary)' }}>{rfq?.rfqNumber}</span><div style={{ fontWeight: 500, fontSize: 13, marginTop: 2 }}>{rfq?.title}</div></div>; } },
+    { key: 'vendorName', label: 'Selected Vendor', render: a => <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={a.vendorName} size={26} />{a.vendorName}</div> },
+    { key: 'totalAmount', label: 'Amount', render: a => <span className="mono" style={{ fontWeight: 600 }}>{formatCurrency(a.totalAmount)}</span> },
+    { key: 'requestedAt', label: 'Requested', render: a => <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{timeAgo(a.requestedAt)}</span> },
+    { key: 'status', label: 'Status', render: a => <StatusBadge status={a.status} /> },
+    { key: 'actions', label: '', render: a => (
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); setSelectedApproval(a); setRemarks(a.remarks || ''); }}>Review</button>
+      </div>
+    )},
+  ];
+
+  if (selectedApproval) {
+    const rfq = rfqs.find(r => r.id === selectedApproval.rfqId);
+    const quote = quotations.find(q => q.id === selectedApproval.quotationId);
+    const vendor = vendors.find(v => v.id === selectedApproval.vendorId);
+    const otherQuotes = quotations.filter(q => q.rfqId === selectedApproval.rfqId && q.id !== selectedApproval.quotationId);
+    const isPending = selectedApproval.status === 'Pending';
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <button className="btn btn-secondary" onClick={() => { setSelectedApproval(null); setRemarks(''); }}>← Back</button>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>Approval Request</span>
+              <StatusBadge status={selectedApproval.status} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 600 }}>{rfq?.title}</h2>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 20 }}>
+          {/* Details */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="card card-body">
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Procurement Summary</div>
+              <div className="grid-2" style={{ gap: 14 }}>
+                {[['RFQ Number', rfq?.rfqNumber], ['Category', rfq?.category], ['Deadline', formatDate(rfq?.deadline)], ['Total Amount', formatCurrency(selectedApproval.totalAmount)]].map(([l, v]) => (
+                  <div key={l}><div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>{l}</div><div style={{ fontSize: 14, fontWeight: 500, fontFamily: l === 'Total Amount' ? 'DM Mono' : undefined, color: l === 'Total Amount' ? 'var(--primary)' : undefined }}>{v}</div></div>
+                ))}
+              </div>
+            </div>
+
+            {/* Selected Vendor */}
+            <div className="card card-body">
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Selected Vendor</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+                <Avatar name={vendor?.name} size={48} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>{vendor?.name}</div>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{vendor?.category}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}><Stars rating={vendor?.rating || 3} /><span style={{ fontSize: 13, color: 'var(--text-muted)' }}>{vendor?.rating}/5</span></div>
+                </div>
+              </div>
+              {quote && (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10, color: 'var(--text-secondary)' }}>QUOTATION BREAKDOWN</div>
+                  <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+                    <table className="data-table">
+                      <thead><tr><th>Item</th><th>Qty</th><th style={{ textAlign: 'right' }}>Unit Price</th><th style={{ textAlign: 'right' }}>Subtotal</th></tr></thead>
+                      <tbody>
+                        {quote.lineItems?.map(li => (
+                          <tr key={li.id}>
+                            <td style={{ fontWeight: 500 }}>{li.name}</td>
+                            <td className="mono">{li.qty} {li.unit}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(li.unitPrice)}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{formatCurrency(li.subtotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '12px 0', borderTop: '1px solid var(--border)' }}>
+                    {[['Subtotal', quote.subtotal], ['CGST (9%)', quote.gstAmount / 2], ['SGST (9%)', quote.gstAmount / 2]].map(([l, v]) => (
+                      <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{l}</span>
+                        <span className="mono">{formatCurrency(v)}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 15, paddingTop: 6, borderTop: '1px solid var(--border)', marginTop: 4 }}>
+                      <span>Grand Total</span>
+                      <span className="mono" style={{ color: 'var(--primary)' }}>{formatCurrency(quote.grandTotal)}</span>
+                    </div>
+                  </div>
+                  {[['Delivery Date', formatDate(quote.deliveryDate)], ['Payment Terms', quote.paymentTerms], ['Validity', quote.validityPeriod]].map(([l, v]) => (
+                    <div key={l} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 8 }}>
+                      <span style={{ color: 'var(--text-muted)' }}>{l}</span>
+                      <span style={{ fontWeight: 500 }}>{v}</span>
+                    </div>
+                  ))}
+                  {quote.notes && <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface)', borderRadius: 6, fontSize: 13, color: 'var(--text-secondary)', fontStyle: 'italic' }}>"{quote.notes}"</div>}
+                </>
+              )}
+            </div>
+
+            {/* Other Quotes */}
+            {otherQuotes.length > 0 && (
+              <div className="card card-body">
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Other Quotations (Not Selected)</div>
+                {otherQuotes.map(q => (
+                  <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={q.vendorName} size={28} /><div style={{ fontSize: 13 }}>{q.vendorName}</div></div>
+                    <span className="mono" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{formatCurrency(q.grandTotal)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Approval Timeline & Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className="card card-body">
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Approval Timeline</div>
+              <div className="approval-step">
+                <div className="approval-step-icon" style={{ background: '#DCFCE7', color: '#16A34A' }}>📋</div>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>Request Created</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedApproval.requestedAt}</div>
+                </div>
+              </div>
+              <div className="approval-step">
+                <div className="approval-step-icon" style={{ background: '#EEF2FF', color: 'var(--primary)' }}>👀</div>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>Under Review</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{isPending ? 'Awaiting manager decision' : selectedApproval.reviewedAt}</div>
+                </div>
+              </div>
+              <div className="approval-step">
+                <div className="approval-step-icon" style={{ background: selectedApproval.status === 'Approved' ? '#DCFCE7' : selectedApproval.status === 'Rejected' ? '#FEE2E2' : '#F1F5F9', color: selectedApproval.status === 'Approved' ? '#16A34A' : selectedApproval.status === 'Rejected' ? '#DC2626' : 'var(--text-muted)' }}>
+                  {selectedApproval.status === 'Approved' ? '✅' : selectedApproval.status === 'Rejected' ? '❌' : '⏳'}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>{selectedApproval.status === 'Pending' ? 'Decision Pending' : selectedApproval.status}</div>
+                  {selectedApproval.remarks && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4, fontStyle: 'italic' }}>"{selectedApproval.remarks}"</div>}
+                </div>
+              </div>
+            </div>
+
+            {isPending && canApprove && (
+              <div className="card card-body">
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>Take Action</div>
+                <div className="form-group" style={{ marginBottom: 16 }}>
+                  <label className="form-label">Remarks {confirmAction === 'reject' && <span className="req">*</span>}</label>
+                  <textarea className="form-textarea" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder={confirmAction === 'reject' ? 'Rejection reason is required...' : 'Optional remarks...'} rows={3} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <button className="btn btn-success" style={{ height: 40 }} onClick={() => setConfirmAction('approve')} disabled={saving}>
+                    {saving && confirmAction === 'approve' ? <><div className="spinner"></div>&nbsp;Processing...</> : '✅ Approve Procurement'}
+                  </button>
+                  <button className="btn btn-danger" style={{ height: 40 }} onClick={() => setConfirmAction('reject')} disabled={saving || !remarks.trim()}>
+                    {saving && confirmAction === 'reject' ? <><div className="spinner"></div>&nbsp;Processing...</> : '❌ Reject (Remarks Required)'}
+                  </button>
+                </div>
+                {!remarks.trim() && <div style={{ fontSize: 12, color: '#D97706', marginTop: 8 }}>Add remarks before rejecting (mandatory for rejections)</div>}
+              </div>
+            )}
+
+            {!isPending && selectedApproval.remarks && (
+              <div className="card card-body">
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>Decision Remarks</div>
+                <div style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, fontStyle: 'italic' }}>"{selectedApproval.remarks}"</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>— by {currentUser?.name} on {selectedApproval.reviewedAt}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <ConfirmDialog open={!!confirmAction} title={confirmAction === 'approve' ? 'Approve Procurement?' : 'Reject Procurement?'} icon={confirmAction === 'approve' ? 'approve' : 'reject'} message={confirmAction === 'approve' ? `Approving will auto-generate a Purchase Order for ${selectedApproval.vendorName}.` : `Rejecting will notify the procurement officer to re-evaluate.`} confirmLabel={confirmAction === 'approve' ? 'Approve & Generate PO' : 'Reject'} confirmClass={confirmAction === 'approve' ? 'btn-success' : 'btn-danger'} onConfirm={() => processAction(confirmAction)} onCancel={() => setConfirmAction(null)} />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+        <div><h2 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Approval Workflow</h2><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Review and process procurement approval requests</p></div>
+        <div className="filter-bar" style={{ marginBottom: 0 }}>
+          <select className="form-select" style={{ width: 160 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">All Status</option>
+            {APPROVAL_STATUSES.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="card">
+        <DataTable columns={columns} data={filtered.map(a => ({ ...a, _onClick: () => { setSelectedApproval(a); setRemarks(a.remarks || ''); } }))} loading={loading} emptyTitle="No approval requests" emptySub="No procurement approvals are pending at this time." />
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════
+// PURCHASE ORDERS SCREEN
+// ═══════════════════════════════════════════════════
+
+const PurchaseOrders = ({ vendorFilter }) => {
+  const { pos, setPos, invoices, setInvoices, rfqs, vendors, currentUser, showToast, addLog, addNotification } = useApp();
+  const [filterStatus, setFilterStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [selectedPO, setSelectedPO] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [emailModal, setEmailModal] = useState(false);
+  useEffect(() => { setTimeout(() => setLoading(false), 500); }, []);
+
+  const myVendorId = currentUser?.vendorId;
+  const displayPos = vendorFilter ? pos.filter(p => myVendorId && p.vendorId === myVendorId) : pos;
+
+  const filtered = useMemo(() => displayPos.filter(p => {
+    const s = search.toLowerCase();
+    const matchSearch = !s || p.poNumber?.toLowerCase().includes(s) || p.vendorName?.toLowerCase().includes(s) || p.rfqNumber?.toLowerCase().includes(s);
+    const matchStatus = !filterStatus || p.status === filterStatus;
+    return matchSearch && matchStatus;
+  }), [displayPos, search, filterStatus]);
+
+  const markDelivered = async (po) => {
+    await new Promise(r => setTimeout(r, 400));
+    setPos(prev => prev.map(p => p.id === po.id ? { ...p, status: 'Delivered' } : p));
+    addLog('UPDATE', 'PO', po.id, `Marked ${po.poNumber} as Delivered`);
+    showToast(`${po.poNumber} marked as delivered`, 'success');
+    setConfirmAction(null);
+    setSelectedPO(prev => prev ? { ...prev, status: 'Delivered' } : prev);
+  };
+
+  const sendPO = (po) => {
+    const vendor = vendors.find(v => v.id === po.vendorId);
+    console.log(`[EMAIL SIMULATION] Sending PO ${po.poNumber} to ${vendor?.email}`);
+    addLog('SEND', 'PO', po.id, `Sent ${po.poNumber} to ${vendor?.name} via email`);
+    showToast(`PO sent to ${vendor?.email}`, 'success', `Subject: Purchase Order ${po.poNumber} from VendorBridge Corp`);
+  };
+
+  const generateInvoice = (po) => {
+    if (po.invoiceId) { showToast('Invoice already generated for this PO', 'warning'); return; }
+    const count = invoices.length + 1;
+    const invNum = generateInvoiceNumber(count);
+    const today = new Date().toISOString().split('T')[0];
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const cgst = po.subtotal * 0.09;
+    const sgst = cgst;
+    const newInvoice = {
+      id: generateId('inv'), invoiceNumber: invNum,
+      poId: po.id, poNumber: po.poNumber,
+      rfqNumber: po.rfqNumber,
+      vendorId: po.vendorId, vendorName: po.vendorName,
+      lineItems: po.lineItems.map(li => ({ ...li, hsn: '9403', rate: li.unitPrice || (li.total / li.qty), amount: li.total })),
+      subtotal: po.subtotal, cgst, sgst, igst: 0, gstTotal: cgst + sgst, grandTotal: po.grandTotal,
+      invoiceDate: today, dueDate, status: 'Draft',
+      paymentDate: null, createdBy: currentUser.id,
+      notes: 'Payment due within 30 days. Late payment attracts 1.5% interest per month.',
+    };
+    setInvoices(prev => [newInvoice, ...prev]);
+    setPos(prev => prev.map(p => p.id === po.id ? { ...p, status: 'Invoiced', invoiceId: newInvoice.id } : p));
+    addLog('GENERATE', 'Invoice', newInvoice.id, `Generated ${invNum} from ${po.poNumber}`);
+    addNotification('invoice', `Invoice ${invNum} generated for ${po.poNumber}`, 'u2');
+    showToast(`Invoice ${invNum} generated!`, 'success');
+    if (selectedPO?.id === po.id) setSelectedPO(prev => ({ ...prev, status: 'Invoiced', invoiceId: newInvoice.id }));
+  };
+
+  const columns = [
+    { key: 'poNumber', label: 'PO Number', render: p => <span className="mono" style={{ color: 'var(--primary)', fontWeight: 600 }}>{p.poNumber}</span> },
+    { key: 'rfqNumber', label: 'RFQ Ref', render: p => <span className="mono" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{p.rfqNumber}</span> },
+    { key: 'vendorName', label: 'Vendor', render: p => <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={p.vendorName} size={26} />{p.vendorName}</div> },
+    { key: 'grandTotal', label: 'Total Amount', render: p => <span className="mono" style={{ fontWeight: 600 }}>{formatCurrency(p.grandTotal)}</span> },
+    { key: 'poDate', label: 'PO Date', render: p => formatDate(p.poDate) },
+    { key: 'deliveryDate', label: 'Delivery Expected', render: p => formatDate(p.deliveryDate) },
+    { key: 'status', label: 'Status', render: p => <StatusBadge status={p.status} /> },
+    { key: 'actions', label: '', render: p => <button className="btn btn-sm btn-secondary" onClick={e => { e.stopPropagation(); setSelectedPO(p); }}>View</button> },
+  ];
+
+  if (selectedPO) {
+    const vendor = vendors.find(v => v.id === selectedPO.vendorId);
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="btn btn-secondary" onClick={() => setSelectedPO(null)}>← Back</button>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="mono" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: 18 }}>{selectedPO.poNumber}</span>
+                <StatusBadge status={selectedPO.status} />
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: 13 }}>Ref: {selectedPO.rfqNumber}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }} className="no-print">
+            <button className="btn btn-secondary" onClick={() => window.print()}><Icon name="print" size={13} /> Download PDF</button>
+            {selectedPO.status === 'Generated' && <button className="btn btn-secondary" onClick={() => sendPO(selectedPO)}><Icon name="send" size={13} /> Send PO</button>}
+            {selectedPO.status === 'Delivered' && !selectedPO.invoiceId && !vendorFilter && <button className="btn btn-primary" onClick={() => generateInvoice(selectedPO)}><Icon name="invoice_gen" size={13} /> Generate Invoice</button>}
+            {['Generated','Sent'].includes(selectedPO.status) && !vendorFilter && <button className="btn btn-success" onClick={() => setConfirmAction('deliver')}><Icon name="deliver" size={13} /> Mark Delivered</button>}
+          </div>
+        </div>
