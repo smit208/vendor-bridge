@@ -1,0 +1,32 @@
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.user-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-info h3 {
+    margin: 0 0 8px 0;
+    color: #1e293b;
+    font-size: 18px;
+}
+
+.user-info p {
+    margin: 4px 0;
+    color: #475569;
+    font-size: 14px;
+}
+
+.user-actions {
+    display: flex;
+    align-items: center;
+}

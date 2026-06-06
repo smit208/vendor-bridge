@@ -1,0 +1,217 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Fuse from 'fuse.js';
+import api from '../services/api';
+import '../styles/universal-search.css';
+
+const RECENT_SEARCHES_KEY = 'fims_recent_searches';
+const MAX_RECENT = 10;
+
+export default function UniversalSearch({ isOpen, onClose }) {
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [recentSearches, setRecentSearches] = useState([]);
+    const [activeCategory, setActiveCategory] = useState('all');
+    const [hoveredResult, setHoveredResult] = useState(null);
+    const [suggestions, setSuggestions] = useState([]);
+    const inputRef = useRef(null);
+    const navigate = useNavigate();
+
+    // Flatten results for keyboard navigation
+    const flatResults = React.useMemo(() => {
+        const flat = [];
+        if (results.pages) flat.push(...results.pages.map(r => ({ ...r, category: 'Pages' })));
+        if (results.transactions) flat.push(...results.transactions.map(r => ({ ...r, category: 'Transactions' })));
+        if (results.materials) flat.push(...results.materials.map(r => ({ ...r, category: 'Raw Materials' })));
+        if (results.products) flat.push(...results.products.map(r => ({ ...r, category: 'Final Products' })));
+        if (results.boms) flat.push(...results.boms.map(r => ({ ...r, category: 'BOMs' })));
+        if (results.production) flat.push(...results.production.map(r => ({ ...r, category: 'Production' })));
+        if (results.users) flat.push(...results.users.map(r => ({ ...r, category: 'Users' })));
+        if (results.dispatches) flat.push(...results.dispatches.map(r => ({ ...r, category: 'Dispatches' })));
+        if (results.approvals) flat.push(...results.approvals.map(r => ({ ...r, category: 'Approvals' })));
+        return flat;
+    }, [results]);
+
+    // Search with debounce
+    useEffect(() => {
+        if (!query || query.length < 2) {
+            setResults({});
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                setLoading(true);
+                const response = await api.get(`/search?q=${encodeURIComponent(query)}`);
+                setResults(response.results || {});
+                setSelectedIndex(0);
+            } catch (error) {
+                console.error('Search failed:', error);
+            } finally {
+                setLoading(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    // Focus input when modal opens
+    useEffect(() => {
+        if (isOpen && inputRef.current) {
+            inputRef.current.focus();
+            setQuery('');
+            setResults({});
+            setSelectedIndex(0);
+        }
+    }, [isOpen]);
+
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!isOpen) return;
+
+            if (e.key === 'Escape') {
+                onClose();
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev + 1) % Math.max(flatResults.length, 1));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev - 1 + flatResults.length) % Math.max(flatResults.length, 1));
+            } else if (e.key === 'Enter' && flatResults.length > 0) {
+                e.preventDefault();
+                handleSelectResult(flatResults[selectedIndex]);
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, flatResults, selectedIndex]);
+
+    const handleSelectResult = (result) => {
+        if (result && result.path) {
+            // Immediately navigate and close
+            onClose();
+            navigate(result.path);
+            setQuery('');
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const getCategoryIcon = (category) => {
+        const icons = {
+            'Pages': '📄',
+            'Transactions': '📋',
+            'Raw Materials': '📦',
+            'Final Products': '🏭',
+            'BOMs': '📝',
+            'Production': '⚙️',
+            'Users': '👤',
+            'Dispatches': '🚚',
+            'Approvals': '✅'
+        };
+        return icons[category] || '📁';
+    };
+
+    return (
+        <>
+            <div className="search-overlay" onClick={onClose} />
+            <div className="search-modal">
+                <div className="search-input-wrapper">
+                    <svg className="search-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        className="search-input"
+                        placeholder="Search transactions, materials, products, users, BOMs, dispatches & more..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                    />
+                    {loading && <div className="search-loading">Searching...</div>}
+                </div>
+
+                <div className="search-results">
+                    {query.length < 2 ? (
+                        <div className="search-empty">
+                            <p>Type at least 2 characters to search</p>
+                            <div className="search-tips">
+                                <strong>Search tips:</strong>
+                                <ul>
+                                    <li>Search by transaction IDs, material names, product codes</li>
+                                    <li>Use ↑↓ arrows to navigate, Enter to select</li>
+                                    <li>Press Esc to close</li>
+                                </ul>
+                            </div>
+                        </div>
+                    ) : flatResults.length === 0 && !loading ? (
+                        <div className="search-empty">
+                            <p>No results found for "{query}"</p>
+                        </div>
+                    ) : (
+                        <div className="search-results-list">
+                            {Object.entries({
+                                Pages: results.pages,
+                                Transactions: results.transactions,
+                                'Raw Materials': results.materials,
+                                'Final Products': results.products,
+                                'BOMs': results.boms,
+                                'Production': results.production,
+                                'Users': results.users,
+                                'Dispatches': results.dispatches,
+                                'Approvals': results.approvals
+                            }).map(([category, items]) => {
+                                if (!items || items.length === 0) return null;
+
+                                return (
+                                    <div key={category} className="search-category">
+                                        <div className="search-category-title">
+                                            <span className="category-icon">{getCategoryIcon(category)}</span>
+                                            {category}
+                                        </div>
+                                        {items.map((item, idx) => {
+                                            const globalIndex = flatResults.findIndex(r => r === item);
+                                            const isSelected = globalIndex === selectedIndex;
+
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className={`search-result-item ${isSelected ? 'selected' : ''}`}
+                                                    onClick={() => handleSelectResult(item)}
+                                                    onMouseEnter={() => setSelectedIndex(globalIndex)}
+                                                >
+                                                    <div className="result-content">
+                                                        <div className="result-title">{item.title}</div>
+                                                        {item.subtitle && <div className="result-subtitle">{item.subtitle}</div>}
+                                                        {item.description && <div className="result-description">{item.description}</div>}
+                                                    </div>
+                                                    <svg className="result-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                        <path d="M7 7h10v10"></path>
+                                                        <path d="M7 17 17 7"></path>
+                                                    </svg>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                <div className="search-footer">
+                    <div className="search-shortcuts">
+                        <kbd>↑↓</kbd> Navigate
+                        <kbd>↵</kbd> Select
+                        <kbd>Esc</kbd> Close
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}
