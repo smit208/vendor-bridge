@@ -1,0 +1,87 @@
+/* Smooth transitions for buttons and modals */
+
+/* Button animations */
+button:not(.custom-dropdown-trigger) {
+    transition: all 0.2s ease;
+}
+
+button:not(.custom-dropdown-trigger):hover {
+    transform: translateY(-1px);
+}
+
+button:not(.custom-dropdown-trigger):active {
+    transform: scale(0.98);
+}
+
+.ghost-btn,
+.ghost-btn-flow {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ghost-btn:hover,
+.ghost-btn-flow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.ghost-btn:active,
+.ghost-btn-flow:active {
+    transform: scale(0.95);
+}
+
+/* Modal animations */
+.modal-overlay {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content,
+.flow-modal-content {
+    animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Smooth transitions for all interactive elements */
+.history-link,
+.close-button {
+    transition: all 0.15s ease;
+}
+
+.history-link:active,
+.close-button:active {
+    transform: scale(0.95);
+}
+
+/* Table row hover */
+.transactions-table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+/* Status badges */
+.status-chip {
+    transition: transform 0.15s ease;
+}
+
+.status-chip:hover {
+    transform: scale(1.05);
+}

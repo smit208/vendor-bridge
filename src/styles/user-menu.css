@@ -1,0 +1,115 @@
+/* User Profile Dropdown Menu Styles */
+.user-menu-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    margin-bottom: 8px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    z-index: 50;
+    min-width: 240px;
+    animation: slideUp 0.2s ease-out;
+}
+
+.user-menu-dropdown.closing {
+    animation: slideDown 0.2s ease-out forwards;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+
+.user-menu-header {
+    padding: 16px;
+}
+
+.user-menu-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 4px 0;
+}
+
+.user-menu-email {
+    font-size: 12px;
+    color: #6b7280;
+    margin: 0 0 8px 0;
+}
+
+.user-menu-role {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 500;
+    color: #374151;
+    background-color: #f3f4f6;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: capitalize;
+}
+
+.user-menu-divider {
+    height: 1px;
+    background-color: #e5e7eb;
+    margin: 0;
+}
+
+.user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #374151;
+    background: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.user-menu-item:hover {
+    background-color: #f9fafb;
+}
+
+.user-menu-item svg {
+    flex-shrink: 0;
+    color: #6b7280;
+}
+
+.user-menu-item.logout {
+    color: #dc2626;
+    border-top: 1px solid #e5e7eb;
+}
+
+.user-menu-item.logout svg {
+    color: #dc2626;
+}
+
+.user-menu-item.logout:hover {
+    background-color: #fef2f2;
+}
